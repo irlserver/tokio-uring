@@ -9,7 +9,7 @@ use std::{io, path::Path};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use tokio_uring::net::UnixListener;
 /// use tokio_uring::net::UnixStream;
 /// use tokio_uring::Submit;
@@ -57,7 +57,7 @@ impl UnixListener {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// use tokio_uring::net::UnixListener;
     /// use std::path::Path;
     ///

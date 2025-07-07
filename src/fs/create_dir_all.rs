@@ -139,10 +139,7 @@ impl DirBuilder {
             match path.parent() {
                 Some(p) => self.recurse_create_dir_all(p).await?,
                 None => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "failed to create whole tree",
-                    ));
+                    return Err(std::io::Error::other("failed to create whole tree"));
                     /* TODO build own allocation free error some day like the std library does.
                     return Err(io::const_io_error!(
                         io::ErrorKind::Uncategorized,

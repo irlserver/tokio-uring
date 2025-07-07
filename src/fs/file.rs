@@ -473,7 +473,7 @@ impl File {
                     return Err(crate::Error(
                         io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer"),
                         slice.into_inner(),
-                    ))
+                    );
                 }
                 Ok((n, slice)) => {
                     pos += n as u64;

@@ -56,7 +56,7 @@
 //! implicit close-on-drop operation happens, so it is recommended to explicitly
 //! call `close()`.
 #![warn(missing_docs)]
-#![allow(clippy::thread_local_initializer_can_be_made_const)]
+#![allow(clippy::missing_const_for_thread_local)]
 
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
