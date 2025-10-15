@@ -58,7 +58,7 @@ impl SharedFd {
         self.inner.fd
     }
 
-    pub(crate) fn fd(&self) -> BorrowedFd {
+    pub(crate) fn fd(&self) -> BorrowedFd<'_> {
         // SAFETY: we're ensuring the fd stays open as long as SharedFd is
         // alive.
         unsafe { BorrowedFd::borrow_raw(self.inner.fd) }

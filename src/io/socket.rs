@@ -2,9 +2,9 @@ use crate::buf::Buffer;
 use crate::io::read_write::Unsubmitted;
 use crate::runtime::driver::op::{Op, Submit};
 use crate::{
+    UnsubmittedOneshot,
     buf::{BoundedBuf, BoundedBufMut, Slice},
     io::SharedFd,
-    UnsubmittedOneshot,
 };
 use std::{
     io,
@@ -77,7 +77,7 @@ impl Socket {
                             "failed to write whole buffer",
                         ),
                         slice.into_inner(),
-                    ))
+                    ));
                 }
                 Ok((n, slice)) => {
                     buf = slice.slice(n..);
@@ -246,7 +246,7 @@ impl AsRawFd for Socket {
 }
 
 impl AsFd for Socket {
-    fn as_fd(&self) -> BorrowedFd {
+    fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.fd()
     }
 }

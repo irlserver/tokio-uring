@@ -2,9 +2,9 @@ use crate::buf::{BoundedBuf, BoundedBufMut, Buffer, Slice};
 use crate::fs::OpenOptions;
 use crate::io::SharedFd;
 
-use crate::runtime::driver::op::Op;
 use crate::MapResult;
 use crate::Unsubmitted;
+use crate::runtime::driver::op::Op;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -473,7 +473,7 @@ impl File {
                     return Err(crate::Error(
                         io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer"),
                         slice.into_inner(),
-                    );
+                    ));
                 }
                 Ok((n, slice)) => {
                     pos += n as u64;

@@ -77,7 +77,7 @@ unsafe impl Sync for Buffer {}
 impl Debug for Buffer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Buffer")
-            .field("iovec", &self.iovec)
+            .field("iovecs", &self.iovec.len())
             .field("cap", &self.cap)
             .field("user", &self.user_data)
             .field("ty", &self.ty)
