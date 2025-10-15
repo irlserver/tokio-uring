@@ -41,6 +41,6 @@ fn main() {
         }
 
         // Include a new line
-        println!("");
+        println!();
     });
 }

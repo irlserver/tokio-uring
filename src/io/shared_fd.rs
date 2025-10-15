@@ -94,7 +94,7 @@ impl SharedFd {
                 }
                 State::WaitingForUniqueness(waker) => {
                     if !waker.will_wake(cx.waker()) {
-                        waker.clone_from(cx.waker())
+                        waker.clone_from(cx.waker());
                     }
 
                     Poll::Pending
