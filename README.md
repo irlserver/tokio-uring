@@ -1,5 +1,8 @@
 # tokio-uring
 
+***This branch/fork is a mess, its history will be forced pushed/rebased/rewritten multiple times a day (or even hour).***
+***If you see anything cool in here, cherry pick the commits fast and don't expect the code to work or stay for long***
+
 This crate provides [`io-uring`] for [Tokio] by exposing a new Runtime that is
 compatible with Tokio but also can drive [`io-uring`]-backed resources. Any
 library that works with [Tokio] also works with `tokio-uring`. The crate
@@ -7,7 +10,6 @@ provides new resource types that work with [`io-uring`].
 
 [`io-uring`]: https://unixism.net/loti/
 [Tokio]: https://github.com/tokio-rs/tokio
-[`fs::File`]: https://docs.rs/tokio-uring/latest/tokio_uring/fs/struct.File.html
 
 [API Docs](https://docs.rs/tokio-uring/latest/tokio_uring) |
 [Chat](https://discord.gg/tokio)
@@ -18,11 +20,14 @@ Using `tokio-uring` requires starting a [`tokio-uring`] runtime. This
 runtime internally manages the main Tokio runtime and a `io-uring` driver.
 
 In your Cargo.toml:
+
 ```toml
 [dependencies]
 tokio-uring = { version = "0.5.0" }
 ```
+
 In your main.rs:
+
 ```rust
 use tokio_uring::fs::File;
 
@@ -45,10 +50,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
 }
 ```
+
 ## Requirements
+
 `tokio-uring` requires a very recent linux kernel. (Not even all kernels with io_uring support will work)
 In particular `5.4.0` does not work (This is standard on Ubuntu 20.4). However `5.11.0` (the ubuntu hwe image) does work.
- 
+
 ## Project status
 
 The `tokio-uring` project is still very young. Currently, we are focusing on
