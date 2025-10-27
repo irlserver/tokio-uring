@@ -174,7 +174,7 @@ pub trait OneshotOutputTransform {
 }
 
 /// In-flight operation
-pub(crate) struct Op<T: 'static, CqeType = SingleCQE> {
+pub struct Op<T: 'static, CqeType = SingleCQE> {
     driver: driver::WeakHandle,
     // Operation index in the slab
     index: usize,
@@ -187,22 +187,35 @@ pub(crate) struct Op<T: 'static, CqeType = SingleCQE> {
 }
 
 /// A Marker for Ops which expect only a single completion event
-pub(crate) struct SingleCQE;
+pub struct SingleCQE;
 
 /// A Marker for Operations will process multiple completion events,
 /// which combined resolve to a single Future value
-pub(crate) struct MultiCQEFuture;
+pub struct MultiCQEFuture;
 
-pub(crate) trait Completable {
+pub trait Completable {
     type Output;
     /// `complete` will be called for cqe's do not have the `more` flag set
     fn complete(self, cqe: CqeResult) -> Self::Output;
 }
 
-pub(crate) trait Updateable: Completable {
+pub trait Updateable: Completable {
     /// Update will be called for cqe's which have the `more` flag set.
     /// The Op should update any internal state as required.
     fn update(&mut self, cqe: CqeResult);
+    
+    /// Returns true if the operation should yield now (e.g., batch is full)
+    /// even though more CQEs may arrive. Default is false (only yield on final CQE).
+    fn should_yield(&self) -> bool {
+        false
+    }
+    
+    /// Called to get the intermediate result when yielding before completion.
+    /// Only called if should_yield() returns true.
+    /// Default implementation panics - override if should_yield() can return true.
+    fn yield_result(&mut self) -> Self::Output {
+        panic!("yield_result called but not implemented - should_yield() must not return true")
+    }
 }
 
 #[allow(dead_code)]

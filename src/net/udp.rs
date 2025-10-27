@@ -354,6 +354,34 @@ impl UdpSocket {
         self.inner.write_fixed(buf).await
     }
 
+    /// Start receiving packets using multishot mode with batching.
+    ///
+    /// Returns batches of received packets. Each await yields a batch of up to
+    /// `batch_size` packets (default 32). The operation continues indefinitely
+    /// until an error occurs or the socket is closed.
+    pub fn recv_from_multishot(
+        &self,
+        buf_group_id: u16,
+        buffer_provider: std::sync::Arc<dyn crate::io::BufferProvider>,
+    ) -> io::Result<crate::runtime::driver::op::Op<crate::io::RecvFromMultishot, crate::runtime::driver::op::MultiCQEFuture>> {
+        
+        crate::io::RecvFromMultishot::recv_from_multishot(&self.inner.fd, buf_group_id, buffer_provider)
+    }
+
+    /// Start receiving packets using multishot mode with custom batch size.
+    ///
+    /// Returns batches of received packets. Each await yields a batch of up to
+    /// `batch_size` packets. The operation continues indefinitely.
+    pub fn recv_from_multishot_with_batch_size(
+        &self,
+        buf_group_id: u16,
+        buffer_provider: std::sync::Arc<dyn crate::io::BufferProvider>,
+        batch_size: usize,
+    ) -> io::Result<crate::runtime::driver::op::Op<crate::io::RecvFromMultishot, crate::runtime::driver::op::MultiCQEFuture>> {
+        
+        crate::io::RecvFromMultishot::recv_from_multishot_with_batch_size(&self.inner.fd, buf_group_id, buffer_provider, batch_size)
+    }
+
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function causes all pending and future I/O on the specified portions to return

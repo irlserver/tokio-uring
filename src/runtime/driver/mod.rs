@@ -340,26 +340,43 @@ impl Driver {
             Lifecycle::CompletionList(indices) => {
                 let mut data = op.take_data().unwrap();
                 let mut status = Poll::Pending;
+                let mut should_yield = false;
                 // Consume the CqeResult list, calling update on the Op on all Cqe's flagged `more`
-                // If the final Cqe is present, clean up and return Poll::Ready
+                // If the final Cqe is present, or if should_yield() returns true, return Poll::Ready
                 for cqe in indices.into_list(completions) {
-                    if cqueue::more(cqe.flags) {
+                    let has_more = cqueue::more(cqe.flags);
+                    if has_more {
                         data.update(cqe);
+                        // Check if we should yield a batch even though more CQEs may arrive
+                        if data.should_yield() {
+                            should_yield = true;
+                            break;
+                        }
                     } else {
                         status = Poll::Ready(cqe);
                         break;
                     }
                 }
-                match status {
-                    Poll::Pending => {
-                        // We need more CQE's. Restore the op state
-                        op.insert_data(data);
-                        *lifecycle = Lifecycle::Waiting(cx.waker().clone());
-                        Poll::Pending
-                    }
-                    Poll::Ready(cqe) => {
-                        self.ops.remove(op.index());
-                        Poll::Ready(data.complete(cqe))
+                
+                // Handle yielding for batch completion
+                if should_yield {
+                    let result = data.yield_result();
+                    op.insert_data(data);
+                    *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                    Poll::Ready(result)
+                } else {
+                    match status {
+                        Poll::Pending => {
+                            // We need more CQE's. Restore the op state
+                            op.insert_data(data);
+                            *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                            Poll::Pending
+                        }
+                        Poll::Ready(cqe) => {
+                            // True completion - remove the op and call complete()
+                            self.ops.remove(op.index());
+                            Poll::Ready(data.complete(cqe))
+                        }
                     }
                 }
             }

@@ -82,9 +82,11 @@ pub mod net;
 
 pub use buf::Buffer;
 pub use io::read_write::*;
+pub use io::recv_from_multishot::{BufferProvider, RecvFromMultishotResult};
+pub use io::{ProvideBuffers, RecvFromMultishot};
 pub use runtime::driver::op::{
     InFlightOneshot, Link, LinkedInFlightOneshot, OneshotOutputTransform, Submit,
-    UnsubmittedOneshot,
+    UnsubmittedOneshot, MultiCQEFuture, SingleCQE,
 };
 pub use runtime::spawn;
 pub use runtime::Runtime;
