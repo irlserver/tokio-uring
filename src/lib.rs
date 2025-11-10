@@ -200,6 +200,26 @@ impl Builder {
         self
     }
 
+    /// Enable SQPOLL mode to eliminate epoll overhead.
+    ///
+    /// SQPOLL creates a kernel thread that continuously polls the submission queue,
+    /// eliminating the need for userspace polling and epoll syscalls.
+    /// This can significantly reduce completion latency but requires elevated privileges.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// tokio_uring::builder()
+    ///     .setup_sqpoll(1000) // 1ms idle timeout
+    ///     .start(async {
+    ///         // Your io_uring operations here
+    ///     });
+    /// ```
+    pub fn setup_sqpoll(&mut self, sq_thread_idle: u32) -> &mut Self {
+        self.urb.setup_sqpoll(sq_thread_idle);
+        self
+    }
+
     /// Replaces the default [`io_uring::Builder`], which controls the settings for the
     /// inner `io_uring` API.
     ///
