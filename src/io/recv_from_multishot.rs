@@ -248,8 +248,10 @@ impl Updateable for RecvFromMultishot {
     }
     
     fn should_yield(&self) -> bool {
-        // Yield when we have accumulated a full batch
-        self.batch.len() >= self.batch_size
+        // Yield when we have accumulated any packets
+        // This ensures buffers are returned promptly even in low-traffic scenarios
+        // Previously only yielded on full batch (batch_size), causing buffer exhaustion
+        !self.batch.is_empty()
     }
     
     fn yield_result(&mut self) -> Self::Output {
