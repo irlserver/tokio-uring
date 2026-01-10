@@ -8,6 +8,7 @@ use std::{
     boxed::Box,
     sync::Arc,
 };
+use tracing::trace;
 
 /// Callback trait for accessing buffer data by ID
 pub trait BufferProvider: Send + Sync {
@@ -63,9 +64,13 @@ impl RecvFromMultishot {
         msghdr.msg_name = socket_addr.as_ptr() as *mut libc::c_void;
         msghdr.msg_namelen = socket_addr.len();
 
-        eprintln!("[TOKIO-URING] RecvFromMultishot::submit - fd={}, buf_group_id={}, batch_size={}", 
-                  fd.raw_fd(), buf_group_id, batch_size);
-        
+        trace!(
+            fd = fd.raw_fd(),
+            buf_group_id = buf_group_id,
+            batch_size = batch_size,
+            "RecvFromMultishot::submit"
+        );
+
         CONTEXT.with(|x| {
             let result = x.handle().expect("Not in a runtime context").submit_op::<_, MultiCQEFuture, _>(
                 RecvFromMultishot {
@@ -85,11 +90,11 @@ impl RecvFromMultishot {
                         recv_from.buf_group_id,
                     )
                     .build();
-                    eprintln!("[TOKIO-URING] RecvMsgMulti SQE created for fd={}", recv_from.fd.raw_fd());
+                    trace!(fd = recv_from.fd.raw_fd(), "RecvMsgMulti SQE created");
                     sqe
                 },
             );
-            eprintln!("[TOKIO-URING] RecvFromMultishot op submitted successfully");
+            trace!("RecvFromMultishot op submitted successfully");
             result
         })
     }
@@ -129,10 +134,14 @@ fn parse_recvmsg_out(buffer: &[u8]) -> io::Result<(SocketAddr, usize, usize)> {
     let controllen = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
     let payloadlen = u32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]) as usize;
     // flags at offset 12-15 (we don't need them here)
-    
-    eprintln!("[TOKIO-URING] RecvMsgOut parsed: namelen={}, controllen={}, payloadlen={}", 
-              namelen, controllen, payloadlen);
-    
+
+    trace!(
+        namelen = namelen,
+        controllen = controllen,
+        payloadlen = payloadlen,
+        "RecvMsgOut parsed"
+    );
+
     // Validate lengths
     let header_size = 16;
     let total_size = header_size + namelen + controllen + payloadlen;
@@ -208,25 +217,26 @@ impl Updateable for RecvFromMultishot {
         let flags = cqe.flags;
         let res = cqe.result.map(|v| v as usize);
 
-        eprintln!("[TOKIO-URING] RecvFromMultishot::update called - result={:?}, flags={:#x}", res, flags);
-
         if let Ok(n) = res {
             // Extract buffer ID from CQE flags
             if let Some(buffer_id) = io_uring::cqueue::buffer_select(flags) {
                 // Check if more completions are expected
                 let more = io_uring::cqueue::more(flags);
-                
-                eprintln!("[TOKIO-URING] RecvFromMultishot::update - received {} bytes, buffer_id={}, more={}", 
-                         n, buffer_id, more);
-                
+
                 // Get buffer data and parse RecvMsgOut structure
                 let buffer = self.buffer_provider.get_buffer(buffer_id, n);
                 
                 match parse_recvmsg_out(buffer) {
                     Ok((source_addr, payload_offset, payloadlen)) => {
-                        eprintln!("[TOKIO-URING] RecvFromMultishot::update - parsed source_addr={}, payload_offset={}, payloadlen={}", 
-                                 source_addr, payload_offset, payloadlen);
-                        
+                        trace!(
+                            %source_addr,
+                            payload_offset = payload_offset,
+                            payloadlen = payloadlen,
+                            buffer_id = buffer_id,
+                            more = more,
+                            "RecvFromMultishot::update - packet received"
+                        );
+
                         self.batch.push(RecvFromMultishotResult {
                             bytes_received: payloadlen,  // Return payload length, not total buffer size
                             source_addr,
@@ -236,14 +246,14 @@ impl Updateable for RecvFromMultishot {
                         });
                     }
                     Err(e) => {
-                        eprintln!("[TOKIO-URING] RecvFromMultishot::update - Failed to parse RecvMsgOut: {}", e);
+                        trace!(error = %e, "RecvFromMultishot::update - Failed to parse RecvMsgOut");
                     }
                 }
             } else {
-                eprintln!("[TOKIO-URING] RecvFromMultishot::update - NO buffer_id in flags!");
+                trace!(flags = flags, "RecvFromMultishot::update - NO buffer_id in flags");
             }
         } else {
-            eprintln!("[TOKIO-URING] RecvFromMultishot::update - ERROR result={:?}", res);
+            trace!(?res, "RecvFromMultishot::update - ERROR result");
         }
     }
     

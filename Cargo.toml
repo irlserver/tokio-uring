@@ -26,6 +26,7 @@ socket2 = { version = "0.6.0", features = ["all"] }
 bytes = { version = "1.0", optional = true }
 futures-util = { version = "0.3.26", default-features = false, features = ["std"] }
 pin-project-lite = "0.2.13"
+tracing = "0.1"
 
 [dev-dependencies]
 tempfile = "3.2.0"
