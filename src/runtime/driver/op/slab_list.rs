@@ -53,6 +53,11 @@ impl SlabListIndices {
     pub(crate) fn into_list<T>(self, slab: &mut Slab<SlabListEntry<T>>) -> SlabList<'_, T> {
         SlabList::from_indices(self, slab)
     }
+
+    /// Returns true if the list is empty (no elements)
+    pub(crate) fn is_empty(&self) -> bool {
+        self.start == usize::MAX
+    }
 }
 
 impl<'a, T> SlabList<'a, T> {

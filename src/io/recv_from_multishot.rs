@@ -3,7 +3,7 @@ use crate::runtime::CONTEXT;
 use crate::{io::SharedFd, Result};
 use socket2::SockAddr;
 use std::{
-    io::{self, IoSliceMut},
+    io,
     net::SocketAddr,
     boxed::Box,
     sync::Arc,
@@ -28,11 +28,15 @@ pub struct RecvFromMultishot {
     buf_group_id: u16,
     socket_addr: Box<SockAddr>,
     msghdr: Box<libc::msghdr>,
-    io_slices: Vec<IoSliceMut<'static>>,
+    io_slices: Vec<libc::iovec>,
     buffer_provider: Arc<dyn BufferProvider>,
     // Accumulated packets waiting to be yielded
     batch: Vec<RecvFromMultishotResult>,
     batch_size: usize,
+    // CRITICAL: These determine the buffer layout for payload offset calculation
+    // The kernel RESERVES this much space in the buffer, regardless of actual data
+    msg_namelen: usize,
+    msg_controllen: usize,
 }
 
 impl RecvFromMultishot {
@@ -52,22 +56,46 @@ impl RecvFromMultishot {
     ) -> io::Result<Op<RecvFromMultishot, MultiCQEFuture>> {
         use io_uring::{opcode, types};
 
-        // Create a dummy buffer for the msghdr structure
-        // The actual data will come from the buffer pool
-        let mut io_slices = vec![IoSliceMut::new(&mut [])];
+        // For multishot recvmsg with provided buffers, the kernel writes to the provided buffer:
+        //   [RecvMsgOut header (16 bytes)] [name/sockaddr] [control data] [payload]
+        //
+        // CRITICAL: msg_iovlen must be > 0 and iov_len must indicate max payload size!
+        // Even though the provided buffer is used, the kernel checks msg_iov to determine
+        // how much payload data to copy. With msg_iovlen=0, no payload is copied.
+        //
+        // We create a dummy iovec with length = max expected payload (MTU - overhead).
+        // The actual buffer pointer doesn't matter since provided buffers are used.
+        const MAX_PAYLOAD: usize = 1500; // MTU
+
+        // Leak a small buffer to create a stable pointer for the iovec
+        // This is a one-time allocation per multishot operation
+        let dummy_buf = Box::leak(Box::new([0u8; 1]));
+        let iovec = libc::iovec {
+            iov_base: dummy_buf.as_mut_ptr() as *mut libc::c_void,
+            iov_len: MAX_PAYLOAD,
+        };
+        let io_slices = vec![iovec];
 
         let socket_addr = Box::new(unsafe { SockAddr::try_init(|_, _| Ok(()))?.1 });
 
+        // CRITICAL: msg_namelen and msg_controllen determine the RESERVED space in the buffer!
+        // The kernel writes: [RecvMsgOut(16)] [name(msg_namelen)] [control(msg_controllen)] [payload]
+        // We must use these values (not the actual data lengths) to find the payload offset.
+        let msg_namelen = socket_addr.len() as usize;
+        let msg_controllen: usize = 0; // We don't request control data
+
         let mut msghdr: Box<libc::msghdr> = Box::new(unsafe { std::mem::zeroed() });
-        msghdr.msg_iov = io_slices.as_mut_ptr().cast();
-        msghdr.msg_iovlen = 0; // Multishot doesn't use iovec
+        msghdr.msg_iov = io_slices.as_ptr() as *mut libc::iovec;
+        msghdr.msg_iovlen = 1; // MUST be > 0 for kernel to copy payload!
         msghdr.msg_name = socket_addr.as_ptr() as *mut libc::c_void;
-        msghdr.msg_namelen = socket_addr.len();
+        msghdr.msg_namelen = msg_namelen as u32;
+        msghdr.msg_controllen = msg_controllen;
 
         trace!(
             fd = fd.raw_fd(),
             buf_group_id = buf_group_id,
             batch_size = batch_size,
+            msg_namelen = msg_namelen,
             "RecvFromMultishot::submit"
         );
 
@@ -82,6 +110,8 @@ impl RecvFromMultishot {
                     buffer_provider,
                     batch: Vec::with_capacity(batch_size),
                     batch_size,
+                    msg_namelen,
+                    msg_controllen,
                 },
                 |recv_from| {
                     let sqe = opcode::RecvMsgMulti::new(
@@ -110,69 +140,72 @@ pub struct RecvFromMultishotResult {
 }
 
 /// Parse RecvMsgOut header from buffer
-/// 
+///
 /// RecvMsgOut structure layout (from io_uring kernel docs):
 /// struct io_uring_recvmsg_out {
-///     __u32 namelen;
-///     __u32 controllen;
-///     __u32 payloadlen;
+///     __u32 namelen;      // ACTUAL bytes written for name
+///     __u32 controllen;   // ACTUAL bytes written for control
+///     __u32 payloadlen;   // ACTUAL bytes written for payload
 ///     __u32 flags;
 /// };
-/// 
-/// Followed by:
-/// - name data (source address, length=namelen)
-/// - control data (length=controllen)
-/// - payload data (length=payloadlen)
-fn parse_recvmsg_out(buffer: &[u8]) -> io::Result<(SocketAddr, usize, usize)> {
+///
+/// CRITICAL: The buffer layout uses RESERVED space (from msghdr), not actual data lengths!
+/// Buffer layout: [Header(16)] [name(msg_namelen)] [control(msg_controllen)] [payload]
+///
+/// The actual data is written at the START of each reserved section:
+/// - Name data at offset 16, actual length = RecvMsgOut.namelen
+/// - Control data at offset 16 + msg_namelen, actual length = RecvMsgOut.controllen
+/// - Payload at offset 16 + msg_namelen + msg_controllen, actual length = RecvMsgOut.payloadlen
+fn parse_recvmsg_out(buffer: &[u8], msg_namelen: usize, msg_controllen: usize) -> io::Result<(SocketAddr, usize, usize)> {
     // Header is 16 bytes (4 x u32)
     if buffer.len() < 16 {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "Buffer too small for RecvMsgOut header"));
     }
-    
-    // Parse header fields (little-endian)
-    let namelen = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
-    let controllen = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
+
+    // Parse header fields (little-endian) - these are ACTUAL bytes written
+    let actual_namelen = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
+    let actual_controllen = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
     let payloadlen = u32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]) as usize;
     // flags at offset 12-15 (we don't need them here)
 
+    // Calculate payload offset using RESERVED space (msg_namelen, msg_controllen), not actual data lengths
+    let header_size = 16;
+    let payload_offset = header_size + msg_namelen + msg_controllen;
+
     trace!(
-        namelen = namelen,
-        controllen = controllen,
+        actual_namelen = actual_namelen,
         payloadlen = payloadlen,
+        payload_offset = payload_offset,
         "RecvMsgOut parsed"
     );
 
-    // Validate lengths
-    let header_size = 16;
-    let total_size = header_size + namelen + controllen + payloadlen;
+    // Validate buffer has enough space
+    let total_size = payload_offset + payloadlen;
     if buffer.len() < total_size {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, 
+        return Err(io::Error::new(io::ErrorKind::InvalidData,
             format!("Buffer too small: expected {}, got {}", total_size, buffer.len())));
     }
-    
-    // Parse source address from name data
-    let name_data = &buffer[header_size..header_size + namelen];
-    let source_addr = if namelen >= std::mem::size_of::<libc::sockaddr_in>() {
+
+    // Parse source address from name data (at offset 16, using actual_namelen)
+    let name_data = &buffer[header_size..header_size + actual_namelen];
+    let source_addr = if actual_namelen >= std::mem::size_of::<libc::sockaddr_in>() {
         // Parse sockaddr structure using socket2's try_init
         let (_, socket2_addr) = unsafe {
             SockAddr::try_init(|storage_ptr, len_ptr| {
                 // Copy the sockaddr data from buffer to storage
                 let storage_ptr = storage_ptr as *mut u8;
-                std::ptr::copy_nonoverlapping(name_data.as_ptr(), storage_ptr, namelen);
-                *len_ptr = namelen as u32;
+                std::ptr::copy_nonoverlapping(name_data.as_ptr(), storage_ptr, actual_namelen);
+                *len_ptr = actual_namelen as u32;
                 Ok(())
             })
         }.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        
+
         socket2_addr.as_socket()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid socket address"))?
     } else {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "Name length too small"));
     };
-    
-    // Calculate payload offset
-    let payload_offset = header_size + namelen + controllen;
-    
+
     Ok((source_addr, payload_offset, payloadlen))
 }
 
@@ -191,7 +224,7 @@ impl Completable for RecvFromMultishot {
                 
                 // Parse RecvMsgOut to get source address and payload
                 let buffer = self.buffer_provider.get_buffer(buffer_id, n);
-                if let Ok((source_addr, payload_offset, payloadlen)) = parse_recvmsg_out(buffer) {
+                if let Ok((source_addr, payload_offset, payloadlen)) = parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen) {
                     self.batch.push(RecvFromMultishotResult {
                         bytes_received: payloadlen,
                         source_addr,
@@ -213,7 +246,7 @@ impl Updateable for RecvFromMultishot {
         // For multishot operations, we accumulate packets in a batch
         // The kernel will continue posting CQEs until the operation is cancelled
         // or an error occurs
-        
+
         let flags = cqe.flags;
         let res = cqe.result.map(|v| v as usize);
 
@@ -225,8 +258,8 @@ impl Updateable for RecvFromMultishot {
 
                 // Get buffer data and parse RecvMsgOut structure
                 let buffer = self.buffer_provider.get_buffer(buffer_id, n);
-                
-                match parse_recvmsg_out(buffer) {
+
+                match parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen) {
                     Ok((source_addr, payload_offset, payloadlen)) => {
                         trace!(
                             %source_addr,

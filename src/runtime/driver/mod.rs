@@ -1,9 +1,10 @@
-use crate::runtime::driver::op::{Completable, Lifecycle, MultiCQEFuture, Op, Updateable};
+use crate::runtime::driver::op::{Completable, CqeResult, Lifecycle, MultiCQEFuture, Op, Updateable};
 
 use io_uring::opcode::AsyncCancel;
 use io_uring::{cqueue, squeue, IoUring};
 use slab::Slab;
 use smallvec::SmallVec;
+use tracing::warn;
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
@@ -312,10 +313,30 @@ impl Driver {
     where
         T: Unpin + 'static + Completable + Updateable,
     {
-        let (lifecycle, completions) = self
-            .ops
-            .get_mut(op.index())
-            .expect("invalid internal state");
+        let (lifecycle, completions) = match self.ops.get_mut(op.index()) {
+            Some(val) => val,
+            None => {
+                // Op was already completed and removed (e.g., socket closed, error, or cancelled)
+                warn!(
+                    "poll_multishot_op: operation {} was already removed from slab",
+                    op.index()
+                );
+                // Return the final result from the stored data if available
+                if let Some(data) = op.take_data() {
+                    // Create an error result - the operation was terminated
+                    let err_cqe = CqeResult {
+                        result: Err(std::io::Error::new(
+                            std::io::ErrorKind::BrokenPipe,
+                            "multishot operation was terminated",
+                        )),
+                        flags: 0,
+                    };
+                    return Poll::Ready(data.complete(err_cqe));
+                }
+                // No data available, just return pending (will never wake)
+                return Poll::Pending;
+            }
+        };
 
         match mem::replace(lifecycle, Lifecycle::Submitted) {
             Lifecycle::Submitted => {
@@ -333,50 +354,73 @@ impl Driver {
             Lifecycle::Ignored(..) => unreachable!(),
             Lifecycle::Completed(cqe) => {
                 // This is possible. We may have previously polled a CompletionList,
-                // and the final CQE registered as Completed
+                // and the final CQE registered as Completed (CQE without 'more' flag)
+                warn!(
+                    "poll_multishot_op: operation {} completed (lifecycle was Completed)",
+                    op.index()
+                );
                 self.ops.remove(op.index());
                 Poll::Ready(op.take_data().unwrap().complete(cqe.into()))
             }
             Lifecycle::CompletionList(indices) => {
                 let mut data = op.take_data().unwrap();
-                let mut status = Poll::Pending;
-                let mut should_yield = false;
-                // Consume the CqeResult list, calling update on the Op on all Cqe's flagged `more`
-                // If the final Cqe is present, or if should_yield() returns true, return Poll::Ready
-                for cqe in indices.into_list(completions) {
+                let mut final_cqe: Option<CqeResult> = None;
+
+                // Convert indices to a mutable list so we can process and preserve remaining
+                let mut list = indices.into_list(completions);
+
+                // Process CQEs one at a time, preserving unprocessed ones if we yield
+                while let Some(cqe) = list.pop() {
                     let has_more = cqueue::more(cqe.flags);
                     if has_more {
                         data.update(cqe);
                         // Check if we should yield a batch even though more CQEs may arrive
                         if data.should_yield() {
-                            should_yield = true;
-                            break;
+                            // CRITICAL: Preserve remaining CQEs by converting list back to indices
+                            // This prevents packet loss when yielding early
+                            let remaining = list.into_indices();
+                            let result = data.yield_result();
+                            op.insert_data(data);
+
+                            // If there are remaining CQEs, keep them in CompletionList
+                            // Otherwise go back to Waiting state
+                            if !remaining.is_empty() {
+                                *lifecycle = Lifecycle::CompletionList(remaining);
+                                // Wake ourselves immediately to process remaining CQEs
+                                cx.waker().wake_by_ref();
+                            } else {
+                                *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                            }
+                            return Poll::Ready(result);
                         }
                     } else {
-                        status = Poll::Ready(cqe);
+                        // Final CQE (no more flag) - operation is truly complete
+                        // This typically indicates socket closed, error, or cancellation
+                        warn!(
+                            "Multishot operation received final CQE (no more flag): result={:?}, flags=0x{:x}",
+                            cqe.result,
+                            cqe.flags
+                        );
+                        final_cqe = Some(cqe);
                         break;
                     }
                 }
-                
-                // Handle yielding for batch completion
-                if should_yield {
-                    let result = data.yield_result();
-                    op.insert_data(data);
-                    *lifecycle = Lifecycle::Waiting(cx.waker().clone());
-                    Poll::Ready(result)
-                } else {
-                    match status {
-                        Poll::Pending => {
-                            // We need more CQE's. Restore the op state
-                            op.insert_data(data);
-                            *lifecycle = Lifecycle::Waiting(cx.waker().clone());
-                            Poll::Pending
-                        }
-                        Poll::Ready(cqe) => {
-                            // True completion - remove the op and call complete()
-                            self.ops.remove(op.index());
-                            Poll::Ready(data.complete(cqe))
-                        }
+
+                // List is either empty or we hit final CQE - drop remaining (shouldn't be any)
+                drop(list);
+
+                match final_cqe {
+                    Some(cqe) => {
+                        // True completion - remove the op and call complete()
+                        self.ops.remove(op.index());
+                        Poll::Ready(data.complete(cqe))
+                    }
+                    None => {
+                        // All CQEs had 'more' flag but should_yield didn't trigger
+                        // We need more CQEs - restore op state and wait
+                        op.insert_data(data);
+                        *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                        Poll::Pending
                     }
                 }
             }
