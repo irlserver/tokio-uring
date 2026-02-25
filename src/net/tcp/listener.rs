@@ -104,10 +104,11 @@ impl TcpListener {
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     /// use tokio_uring::net::TcpListener;
     ///
-    /// let listener = TcpListener::bind("127.0.0.1:8080".parse().unwrap()).unwrap();
+    /// let listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     ///
     /// let addr = listener.local_addr().expect("Couldn't get local address");
-    /// assert_eq!(addr, SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    /// assert_eq!(addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
+    /// assert_ne!(addr.port(), 0); // OS assigned a real port
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         let fd = self.inner.as_raw_fd();
