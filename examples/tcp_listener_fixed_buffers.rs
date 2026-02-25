@@ -88,9 +88,7 @@ async fn echo_handler(stream: TcpStream, peer: SocketAddr, registry: FixedBufReg
             }
             assert_eq!(4096, fbuf1.len()); // To prove a point.
 
-            let (res, nslice) = stream.write_fixed_all(fbuf1.slice(..read)).await;
-
-            res.unwrap();
+            let (_res, nslice) = stream.write_fixed_all(fbuf1.slice(..read)).await.unwrap();
             println!("peer {} all {} bytes ping-ponged", peer, read);
             n += read;
 

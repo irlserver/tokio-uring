@@ -583,7 +583,7 @@ mod test {
     use super::*;
 
     #[derive(Debug)]
-    pub(crate) struct Completion {
+    pub struct Completion {
         result: io::Result<u32>,
         flags: u32,
         data: Rc<()>,
