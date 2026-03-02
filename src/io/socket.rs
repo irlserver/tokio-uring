@@ -201,10 +201,6 @@ impl Socket {
         sys_listener.set_reuse_port(true)?;
         sys_listener.set_reuse_address(true)?;
 
-        // TODO: config for buffer sizes
-        // sys_listener.set_send_buffer_size(send_buf_size)?;
-        // sys_listener.set_recv_buffer_size(recv_buf_size)?;
-
         sys_listener.bind(&socket_addr)?;
 
         let fd = SharedFd::new(sys_listener.into_raw_fd());

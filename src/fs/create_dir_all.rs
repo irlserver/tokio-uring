@@ -100,7 +100,6 @@ impl DirBuilder {
     ///         .mode(0o700) // user-only mode: drwx------
     ///         .create(path).await.unwrap();
     ///
-    ///     // TODO change with tokio_uring version
     ///     assert!(std::fs::metadata(path).unwrap().is_dir());
     /// })
     /// ```
@@ -116,14 +115,8 @@ impl DirBuilder {
         }
     }
 
-    // This recursive function is very closely modeled after the std library version.
-    //
-    // A recursive async function requires a Boxed Future. TODO There may be an implementation that
-    // is less costly in terms of heap allocations. Maybe a non-recursive version is possible given
-    // we even know the path separator for Linux. Or maybe expand the first level to avoid
-    // recursion when only the first level of the directory needs to be built. For now, this serves
-    // its purpose.
-
+    // Recursive async function modeled after the std library version.
+    // Uses a Boxed Future since recursive async functions require it.
     fn recurse_create_dir_all<'a>(&'a self, path: &'a Path) -> LocalBoxFuture<'a, io::Result<()>> {
         Box::pin(async move {
             if path == Path::new("") {
@@ -140,12 +133,6 @@ impl DirBuilder {
                 Some(p) => self.recurse_create_dir_all(p).await?,
                 None => {
                     return Err(std::io::Error::other("failed to create whole tree"));
-                    /* TODO build own allocation free error some day like the std library does.
-                    return Err(io::const_io_error!(
-                        io::ErrorKind::Uncategorized,
-                        "failed to create whole tree",
-                    ));
-                    */
                 }
             }
             match self.inner.mkdir(path).await {
@@ -156,9 +143,6 @@ impl DirBuilder {
         })
     }
 }
-
-// TODO this DirBuilder and this fs_imp module is modeled after the std library's. Here there is
-// only Linux supported so is it worth to continue this separation?
 
 mod fs_imp {
     use crate::runtime::driver::op::Op;

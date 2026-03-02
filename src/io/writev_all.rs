@@ -18,8 +18,10 @@ pub(crate) async fn writev_at_all<T: BoundedBuf>(
     mut bufs: Vec<T>,
     offset: Option<u64>,
 ) -> crate::Result<usize, Vec<T>> {
-    // TODO decide if the function should return immediately if all the buffer lengths
-    // were to sum to zero. That would save an allocation and one call into writev.
+    // Return immediately if all buffers are empty.
+    if bufs.iter().all(|b| b.bytes_init() == 0) {
+        return Ok((0, bufs));
+    }
 
     // The fd is cloned once.
     let mut fd = fd.clone();
@@ -62,11 +64,13 @@ pub(crate) async fn writev_at_all<T: BoundedBuf>(
             Err(e) => return Err(crate::Error(e, bufs)),
         };
 
-        // TODO if n is zero, while there was more data to be written, should this be interpreted
-        // as the file is closed so an error should be returned? Otherwise we reach the
-        // unreachable! panic below.
-        //
-        // if n == 0 { return Err(..); }
+        // A zero-byte write when there's data remaining means the fd is closed.
+        if n == 0 {
+            return Err(crate::Error(
+                io::Error::new(io::ErrorKind::WriteZero, "write returned 0 bytes"),
+                bufs,
+            ));
+        }
 
         total += n;
 

@@ -16,8 +16,6 @@ pub(crate) struct Statx {
     #[allow(dead_code)]
     path: CString,
 
-    // TODO consider returning this type when the operation is complete so the caller has the boxed value.
-    // The builder could even recycle an old boxed value and pass it in here.
     statx: Box<crate::compat::statx>,
 }
 
@@ -38,8 +36,7 @@ impl Op<Statx> {
             None => {
                 // If there is no path, add appropriate bit to flags.
                 flags |= libc::AT_EMPTY_PATH;
-                CStr::from_bytes_with_nul(b"\0").unwrap().into() // TODO Is there a constant CString we
-                                                                 // could use here.
+                CStr::from_bytes_with_nul(b"\0").unwrap().into()
             }
         };
         CONTEXT.with(|x| {

@@ -290,14 +290,12 @@ impl StatxBuilder {
     /// })
     /// ```
     pub async fn statx(&mut self) -> io::Result<compat::statx> {
-        // TODO should the statx() terminator be renamed to something like submit()?
         let fd = self.file.take();
         let path = self.path.take();
         Op::statx(fd, path, self.flags, self.mask)?.await
     }
 }
 
-// TODO consider replacing this with a Statx struct with useful helper methods.
 /// Returns two bools, is_dir and is_regfile.
 ///
 /// They both can't be true at the same time and there are many reasons they may both be false.
