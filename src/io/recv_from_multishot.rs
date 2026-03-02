@@ -89,7 +89,7 @@ impl RecvFromMultishot {
         msghdr.msg_iovlen = 1; // MUST be > 0 for kernel to copy payload!
         msghdr.msg_name = socket_addr.as_ptr() as *mut libc::c_void;
         msghdr.msg_namelen = msg_namelen as u32;
-        msghdr.msg_controllen = msg_controllen;
+        msghdr.msg_controllen = msg_controllen as _;
 
         trace!(
             fd = fd.raw_fd(),

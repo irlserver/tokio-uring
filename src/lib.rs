@@ -71,6 +71,7 @@ macro_rules! syscall {
 
 #[macro_use]
 mod future;
+pub(crate) mod compat;
 mod io;
 #[allow(missing_docs)]
 pub mod runtime;

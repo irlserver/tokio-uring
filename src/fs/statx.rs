@@ -1,4 +1,5 @@
 use super::File;
+use crate::compat;
 use crate::io::{cstr, SharedFd};
 use crate::runtime::driver::op::Op;
 use std::{ffi::CString, io, path::Path};
@@ -28,9 +29,9 @@ impl File {
     ///     f.close().await.unwrap();
     /// })
     /// ```
-    pub async fn statx(&self) -> io::Result<libc::statx> {
+    pub async fn statx(&self) -> io::Result<compat::statx> {
         let flags = libc::AT_EMPTY_PATH;
-        let mask = libc::STATX_ALL;
+        let mask = compat::STATX_ALL;
         Op::statx(Some(self.fd.clone()), None, flags, mask)?.await
     }
 
@@ -73,7 +74,7 @@ impl File {
             file: Some(self.fd.clone()),
             path: None,
             flags: libc::AT_EMPTY_PATH,
-            mask: libc::STATX_ALL,
+            mask: compat::STATX_ALL,
         }
     }
 }
@@ -102,7 +103,7 @@ impl File {
 ///     let statx = tokio_uring::fs::statx("foo.txt").await.unwrap();
 /// })
 /// ```
-pub async fn statx<P: AsRef<Path>>(path: P) -> io::Result<libc::statx> {
+pub async fn statx<P: AsRef<Path>>(path: P) -> io::Result<compat::statx> {
     StatxBuilder::new().pathname(path).unwrap().statx().await
 }
 
@@ -162,7 +163,7 @@ impl StatxBuilder {
             file: None,
             path: None,
             flags: libc::AT_EMPTY_PATH,
-            mask: libc::STATX_ALL,
+            mask: compat::STATX_ALL,
         }
     }
 
@@ -288,7 +289,7 @@ impl StatxBuilder {
     ///     dir.close().await.unwrap();
     /// })
     /// ```
-    pub async fn statx(&mut self) -> io::Result<libc::statx> {
+    pub async fn statx(&mut self) -> io::Result<compat::statx> {
         // TODO should the statx() terminator be renamed to something like submit()?
         let fd = self.file.take();
         let path = self.path.take();
@@ -303,15 +304,15 @@ impl StatxBuilder {
 #[allow(dead_code)]
 pub async fn is_dir_regfile<P: AsRef<Path>>(path: P) -> (bool, bool) {
     let mut builder = crate::fs::StatxBuilder::new();
-    if builder.mask(libc::STATX_TYPE).pathname(path).is_err() {
+    if builder.mask(compat::STATX_TYPE).pathname(path).is_err() {
         return (false, false);
     }
 
     let res = builder.statx().await;
     match res {
         Ok(statx) => (
-            (u32::from(statx.stx_mode) & libc::S_IFMT) == libc::S_IFDIR,
-            (u32::from(statx.stx_mode) & libc::S_IFMT) == libc::S_IFREG,
+            (u32::from(statx.stx_mode) & libc::S_IFMT as u32) == libc::S_IFDIR as u32,
+            (u32::from(statx.stx_mode) & libc::S_IFMT as u32) == libc::S_IFREG as u32,
         ),
         Err(_) => (false, false),
     }
