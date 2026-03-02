@@ -2,13 +2,9 @@ use std::io;
 
 use io_uring::{opcode, types};
 
-use crate::{
-    io::SharedFd,
-    runtime::{
-        driver::op::{Completable, CqeResult, Op},
-        CONTEXT,
-    },
-};
+use crate::io::SharedFd;
+use crate::runtime::driver::op::{Completable, CqeResult, Op};
+use crate::runtime::CONTEXT;
 
 pub(crate) struct Fallocate {
     fd: SharedFd,

@@ -1,8 +1,8 @@
-use tokio_uring::buf::{BoundedBuf, BoundedBufMut, Slice};
-
 use std::mem;
 use std::ops::RangeBounds;
 use std::slice::SliceIndex;
+
+use tokio_uring::buf::{BoundedBuf, BoundedBufMut, Slice};
 
 #[test]
 fn test_vec() {

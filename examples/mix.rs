@@ -4,7 +4,9 @@
 
 use std::env;
 
-use tokio_uring::{fs::File, net::TcpListener, Buffer, Submit};
+use tokio_uring::fs::File;
+use tokio_uring::net::TcpListener;
+use tokio_uring::{Buffer, Submit};
 
 fn main() {
     // The file to serve over TCP is passed as a CLI argument

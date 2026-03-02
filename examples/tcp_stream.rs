@@ -1,6 +1,8 @@
-use std::{env, net::SocketAddr};
+use std::env;
+use std::net::SocketAddr;
 
-use tokio_uring::{net::TcpStream, Buffer, Submit};
+use tokio_uring::net::TcpStream;
+use tokio_uring::{Buffer, Submit};
 
 fn main() {
     let args: Vec<_> = env::args().collect();

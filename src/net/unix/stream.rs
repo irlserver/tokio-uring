@@ -1,14 +1,12 @@
-use crate::{
-    buf::{BoundedBuf, BoundedBufMut, Buffer},
-    io::{SharedFd, Socket},
-    Submit, Unsubmitted,
-};
+use std::io;
+use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
+use std::path::Path;
+
 use socket2::SockAddr;
-use std::{
-    io,
-    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
-    path::Path,
-};
+
+use crate::buf::{BoundedBuf, BoundedBufMut, Buffer};
+use crate::io::{SharedFd, Socket};
+use crate::{Submit, Unsubmitted};
 
 /// A Unix stream between two local sockets on a Unix OS.
 ///
@@ -18,9 +16,10 @@ use std::{
 /// # Examples
 ///
 /// ```no_run
+/// use std::net::ToSocketAddrs;
+///
 /// use tokio_uring::net::UnixStream;
 /// use tokio_uring::Submit;
-/// use std::net::ToSocketAddrs;
 ///
 /// fn main() -> std::io::Result<()> {
 ///     tokio_uring::start(async {
@@ -28,7 +27,11 @@ use std::{
 ///         let mut stream = UnixStream::connect("/tmp/tokio-uring-unix-test.sock").await?;
 ///
 ///         // Write some data.
-///         stream.write(b"hello world!".to_vec().into()).submit().await.unwrap();
+///         stream
+///             .write(b"hello world!".to_vec().into())
+///             .submit()
+///             .await
+///             .unwrap();
 ///
 ///         Ok(())
 ///     })

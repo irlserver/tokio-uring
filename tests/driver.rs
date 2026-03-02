@@ -1,6 +1,6 @@
 use tempfile::NamedTempFile;
-
-use tokio_uring::{fs::File, Buffer, Submit};
+use tokio_uring::fs::File;
+use tokio_uring::{Buffer, Submit};
 
 #[path = "../src/future.rs"]
 #[allow(warnings)]
@@ -26,8 +26,8 @@ fn too_many_submissions() {
 
 #[test]
 fn completion_overflow() {
-    use std::process;
-    use std::{thread, time};
+    use std::{process, thread, time};
+
     use tokio::task::JoinSet;
 
     let spawn_cnt = 50;
@@ -63,6 +63,7 @@ fn tempfile() -> NamedTempFile {
 async fn poll_once(future: impl std::future::Future) {
     // use std::future::Future;
     use std::task::Poll;
+
     use tokio::pin;
 
     pin!(future);

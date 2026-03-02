@@ -3,11 +3,10 @@
 mod future;
 
 use std::io::Write;
+
+use tempfile::{tempdir, NamedTempFile};
 use tokio_test::assert_ok;
 use tokio_uring::fs;
-
-use tempfile::tempdir;
-use tempfile::NamedTempFile;
 
 const TEST_PAYLOAD: &[u8] = b"I am data in the source file";
 

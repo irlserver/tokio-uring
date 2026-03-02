@@ -1,13 +1,12 @@
+use std::fs::File as StdFile;
+use std::io::prelude::*;
+use std::{iter, mem};
+
+use tempfile::NamedTempFile;
 use tokio_uring::buf::fixed::{pool, registry};
 use tokio_uring::buf::{BoundedBuf, BoundedBufMut};
 use tokio_uring::fs::File;
 use tokio_uring::Buffer;
-
-use std::fs::File as StdFile;
-use std::io::prelude::*;
-use std::iter;
-use std::mem;
-use tempfile::NamedTempFile;
 
 const HELLO: &[u8] = b"hello world...";
 

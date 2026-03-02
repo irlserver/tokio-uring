@@ -1,7 +1,6 @@
-use super::{IoBuf, IoBufMut, Slice};
+use std::{ops, ptr};
 
-use std::ops;
-use std::ptr;
+use super::{IoBuf, IoBufMut, Slice};
 
 /// A possibly bounded view into an owned [`IoBuf`] buffer.
 ///

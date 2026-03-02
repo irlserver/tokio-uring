@@ -8,11 +8,9 @@ pub mod fixed;
 mod io_buf;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
-use std::{
-    iter::zip,
-    mem::ManuallyDrop,
-    ops::{Index, IndexMut},
-};
+use std::iter::zip;
+use std::mem::ManuallyDrop;
+use std::ops::{Index, IndexMut};
 
 pub use io_buf::IoBuf;
 
@@ -43,7 +41,6 @@ pub(crate) fn deref_mut(buf: &mut impl IoBufMut) -> &mut [u8] {
 ///
 /// If you implement `BufferImpl` for some type `B`, `from_raw_parts(into_raw_parts(buf))`
 /// must be equal to origin `buf`.
-///
 #[allow(missing_docs)]
 pub unsafe trait BufferImpl: Any {
     type UserData: Send + Sync + 'static;

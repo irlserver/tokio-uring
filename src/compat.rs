@@ -7,8 +7,8 @@
 
 pub const STATX_TYPE: u32 = 0x0001;
 pub const STATX_MODE: u32 = 0x0002;
-pub const STATX_BASIC_STATS: u32 = 0x07FF;
-pub const STATX_ALL: u32 = 0x0FFF;
+pub const STATX_BASIC_STATS: u32 = 0x07ff;
+pub const STATX_ALL: u32 = 0x0fff;
 
 #[repr(C)]
 pub struct statx_timestamp {

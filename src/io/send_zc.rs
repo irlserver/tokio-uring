@@ -1,8 +1,10 @@
+use std::io;
+
+use crate::buf::BoundedBuf;
+use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, MultiCQEFuture, Op, Updateable};
 use crate::runtime::CONTEXT;
-use crate::WithBuffer;
-use crate::{buf::BoundedBuf, io::SharedFd, Result};
-use std::io;
+use crate::{Result, WithBuffer};
 
 pub(crate) struct SendZc<T> {
     /// Holds a strong ref to the FD, preventing the file from being closed

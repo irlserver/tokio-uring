@@ -1,17 +1,17 @@
-use crate::runtime::driver::op::{Completable, CqeResult, Lifecycle, MultiCQEFuture, Op, Updateable};
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::task::{Context, Poll};
+use std::{io, mem};
 
+pub(crate) use handle::*;
 use io_uring::opcode::AsyncCancel;
 use io_uring::{cqueue, squeue, IoUring};
 use slab::Slab;
 use smallvec::SmallVec;
 use tracing::warn;
 
-use std::os::unix::io::{AsRawFd, RawFd};
-
-use std::task::{Context, Poll};
-use std::{io, mem};
-
-pub(crate) use handle::*;
+use crate::runtime::driver::op::{
+    Completable, CqeResult, Lifecycle, MultiCQEFuture, Op, Updateable,
+};
 
 mod handle;
 pub(crate) mod op;
@@ -397,9 +397,9 @@ impl Driver {
                         // Final CQE (no more flag) - operation is truly complete
                         // This typically indicates socket closed, error, or cancellation
                         warn!(
-                            "Multishot operation received final CQE (no more flag): result={:?}, flags=0x{:x}",
-                            cqe.result,
-                            cqe.flags
+                            "Multishot operation received final CQE (no more flag): result={:?}, \
+                             flags=0x{:x}",
+                            cqe.result, cqe.flags
                         );
                         final_cqe = Some(cqe);
                         break;
@@ -576,11 +576,11 @@ impl Drop for Ops {
 mod test {
     use std::rc::Rc;
 
-    use crate::runtime::driver::op::{Completable, CqeResult, Op};
-    use crate::runtime::CONTEXT;
     use tokio_test::{assert_pending, assert_ready, task};
 
     use super::*;
+    use crate::runtime::driver::op::{Completable, CqeResult, Op};
+    use crate::runtime::CONTEXT;
 
     #[derive(Debug)]
     pub struct Completion {

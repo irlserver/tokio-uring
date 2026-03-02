@@ -1,8 +1,8 @@
-use tokio::sync::Notify;
-
 use std::cmp;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use tokio::sync::Notify;
 
 use crate::buf::IoBuf;
 use crate::Buffer;

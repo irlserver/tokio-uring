@@ -1,15 +1,14 @@
+use std::any::TypeId;
+use std::io;
+
 use crate::buf::fixed::pool::PoolInfo;
 use crate::buf::fixed::registry::RegistryInfo;
 use crate::buf::fixed::{pool, registry};
 use crate::buf::BoundedBuf;
 use crate::io::SharedFd;
 use crate::runtime::driver::op::{self, Completable, Op};
-use crate::WithBuffer;
-use crate::{Buffer, Result};
-
 use crate::runtime::CONTEXT;
-use std::any::TypeId;
-use std::io;
+use crate::{Buffer, Result, WithBuffer};
 
 pub(crate) struct WriteFixed<T> {
     /// Holds a strong ref to the FD, preventing the file from being closed

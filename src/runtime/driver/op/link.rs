@@ -1,10 +1,9 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
 use io_uring::squeue::Flags;
 use pin_project_lite::pin_project;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
 
 use crate::{OneshotOutputTransform, Submit, UnsubmittedOneshot};
 

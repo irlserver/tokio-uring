@@ -1,8 +1,9 @@
-use crate::runtime::driver::op::{Completable, CqeResult, Op};
-use crate::runtime::CONTEXT;
 use std::ffi::CString;
 use std::io;
 use std::path::Path;
+
+use crate::runtime::driver::op::{Completable, CqeResult, Op};
+use crate::runtime::CONTEXT;
 
 /// Unlink a path relative to the current working directory of the caller's process.
 pub(crate) struct Unlink {

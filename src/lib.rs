@@ -81,20 +81,20 @@ pub mod buf;
 pub mod fs;
 pub mod net;
 
+use std::future::Future;
+
 pub use buf::Buffer;
 pub use io::read_write::*;
 pub use io::recv_from_multishot::{BufferProvider, RecvFromMultishotResult};
 pub use io::{ProvideBuffers, RecvFromMultishot};
 pub use runtime::driver::op::{
-    InFlightOneshot, Link, LinkedInFlightOneshot, OneshotOutputTransform, Submit,
-    UnsubmittedOneshot, MultiCQEFuture, SingleCQE,
+    InFlightOneshot, Link, LinkedInFlightOneshot, MultiCQEFuture, OneshotOutputTransform,
+    SingleCQE, Submit, UnsubmittedOneshot,
 };
-pub use runtime::spawn;
-pub use runtime::Runtime;
+pub use runtime::{spawn, Runtime};
 pub use types::*;
 
 use crate::runtime::driver::op::Op;
-use std::future::Future;
 
 /// Starts an `io_uring` enabled Tokio runtime.
 ///
@@ -243,9 +243,7 @@ impl Builder {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::builder()
     ///         .entries(64)
-    ///         .uring_builder(tokio_uring::uring_builder()
-    ///             .setup_cqsize(1024)
-    ///             )
+    ///         .uring_builder(tokio_uring::uring_builder().setup_cqsize(1024))
     ///         .start(async {
     ///             let listener = TcpListener::bind("127.0.0.1:8080").await?;
     ///
@@ -253,8 +251,7 @@ impl Builder {
     ///                 let (socket, _) = listener.accept().await?;
     ///                 // process socket
     ///             }
-    ///         }
-    ///     )
+    ///         })
     /// }
     /// ```
     pub fn start<F: Future>(&self, future: F) -> F::Output {

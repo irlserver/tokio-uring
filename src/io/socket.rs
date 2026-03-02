@@ -1,17 +1,13 @@
-use crate::buf::Buffer;
+use std::io;
+use std::net::SocketAddr;
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, IntoRawFd, RawFd};
+use std::path::Path;
+
+use crate::buf::{BoundedBuf, BoundedBufMut, Buffer, Slice};
 use crate::io::read_write::Unsubmitted;
+use crate::io::SharedFd;
 use crate::runtime::driver::op::{Op, Submit};
-use crate::{
-    UnsubmittedOneshot,
-    buf::{BoundedBuf, BoundedBufMut, Slice},
-    io::SharedFd,
-};
-use std::{
-    io,
-    net::SocketAddr,
-    os::unix::io::{AsFd, AsRawFd, BorrowedFd, IntoRawFd, RawFd},
-    path::Path,
-};
+use crate::UnsubmittedOneshot;
 
 #[derive(Clone)]
 pub(crate) struct Socket {

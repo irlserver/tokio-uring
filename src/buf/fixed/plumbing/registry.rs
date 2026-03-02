@@ -1,6 +1,7 @@
 use std::cmp;
 
-use crate::{buf::IoBuf, Buffer};
+use crate::buf::IoBuf;
+use crate::Buffer;
 
 // Internal state shared by FixedBufRegistry and Buffers.
 pub(crate) struct Registry {

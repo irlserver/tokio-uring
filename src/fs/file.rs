@@ -1,14 +1,12 @@
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::path::Path;
+use std::{fmt, io};
+
 use crate::buf::{BoundedBuf, BoundedBufMut, Buffer, Slice};
 use crate::fs::OpenOptions;
 use crate::io::SharedFd;
-
-use crate::MapResult;
-use crate::Unsubmitted;
 use crate::runtime::driver::op::Op;
-use std::fmt;
-use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::path::Path;
+use crate::{MapResult, Unsubmitted};
 
 /// A reference to an open file on the filesystem.
 ///
@@ -40,7 +38,10 @@ use std::path::Path;
 ///         let file = File::create("hello.txt").await?;
 ///
 ///         // Write some data
-///         let (n, buf) = file.write_at(b"hello world".to_vec().into(), 0).submit().await?;
+///         let (n, buf) = file
+///             .write_at(b"hello world".to_vec().into(), 0)
+///             .submit()
+///             .await?;
 ///
 ///         println!("wrote {} bytes", n);
 ///
@@ -263,7 +264,11 @@ impl File {
     ///         let file = File::create("foo.txt").await?;
     ///
     ///         // Writes some prefix of the byte string, not necessarily all of it.
-    ///         let bufs = vec!["some".to_owned().into_bytes(), " bytes".to_owned().into_bytes()].into();
+    ///         let bufs = vec![
+    ///             "some".to_owned().into_bytes(),
+    ///             " bytes".to_owned().into_bytes(),
+    ///         ]
+    ///         .into();
     ///         let (n, _) = file.write_at(bufs, 0).submit().await?;
     ///
     ///         println!("wrote {} bytes", n);
@@ -295,12 +300,13 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    ///# fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use tokio_uring::fs::File;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use std::iter;
+    ///
     /// use tokio_uring::buf::fixed::registry;
     /// use tokio_uring::buf::BoundedBuf;
+    /// use tokio_uring::fs::File;
     /// use tokio_uring::Buffer;
-    /// use std::iter;
     ///
     /// tokio_uring::start(async {
     ///     let registry = registry::register(iter::repeat(vec![0u8; 10]).take(10).map(Buffer::from))?;
@@ -317,7 +323,7 @@ impl File {
     ///     f.close().await?;
     ///     Ok(())
     /// })
-    ///# }
+    /// # }
     /// ```
     pub async fn read_fixed_at<T>(&self, buf: T, pos: u64) -> crate::Result<usize, T>
     where
@@ -362,7 +368,10 @@ impl File {
     ///         let file = File::create("foo.txt").await?;
     ///
     ///         // Writes some prefix of the byte string, not necessarily all of it.
-    ///         let (n, _) = file.write_at(b"some bytes".to_vec().into(), 0).submit().await?;
+    ///         let (n, _) = file
+    ///             .write_at(b"some bytes".to_vec().into(), 0)
+    ///             .submit()
+    ///             .await?;
     ///
     ///         println!("wrote {} bytes", n);
     ///
@@ -393,14 +402,15 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    ///# fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use tokio_uring::fs::File;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use tokio_uring::buf::fixed::registry;
     /// use tokio_uring::buf::BoundedBuf;
+    /// use tokio_uring::fs::File;
     /// use tokio_uring::Buffer;
     ///
     /// tokio_uring::start(async {
-    ///     let registry = registry::register(vec![b"some bytes".to_vec()].into_iter().map(Buffer::from))?;
+    ///     let registry =
+    ///         registry::register(vec![b"some bytes".to_vec()].into_iter().map(Buffer::from))?;
     ///
     ///     let file = File::create("foo.txt").await?;
     ///
@@ -416,7 +426,7 @@ impl File {
     ///     file.close().await?;
     ///     Ok(())
     /// })
-    ///# }
+    /// # }
     /// ```
     pub async fn write_fixed_at<T>(&self, buf: T, pos: u64) -> crate::Result<usize, T>
     where
@@ -509,7 +519,9 @@ impl File {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
     ///         let f = File::create("foo.txt").await?;
-    ///         f.write_at(b"Hello, world!".to_vec().into(), 0).submit().await?;
+    ///         f.write_at(b"Hello, world!".to_vec().into(), 0)
+    ///             .submit()
+    ///             .await?;
     ///
     ///         f.sync_all().await?;
     ///
@@ -546,7 +558,9 @@ impl File {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
     ///         let f = File::create("foo.txt").await?;
-    ///         f.write_at(b"Hello, world!".to_vec().into(), 0).submit().await?;
+    ///         f.write_at(b"Hello, world!".to_vec().into(), 0)
+    ///             .submit()
+    ///             .await?;
     ///
     ///         f.sync_data().await?;
     ///

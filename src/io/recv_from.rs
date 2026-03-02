@@ -1,12 +1,15 @@
+use std::boxed::Box;
+use std::io;
+use std::io::IoSliceMut;
+use std::net::SocketAddr;
+
+use socket2::SockAddr;
+
+use crate::buf::BoundedBufMut;
+use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, Op};
 use crate::runtime::CONTEXT;
-use crate::WithBuffer;
-use crate::{buf::BoundedBufMut, io::SharedFd, Result};
-use socket2::SockAddr;
-use std::{
-    io::IoSliceMut,
-    {boxed::Box, io, net::SocketAddr},
-};
+use crate::{Result, WithBuffer};
 
 #[allow(dead_code)]
 pub(crate) struct RecvFrom<T> {

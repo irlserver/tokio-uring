@@ -1,13 +1,14 @@
+use std::any::TypeId;
+use std::io;
+
 use libc::iovec;
 
 use crate::buf::fixed::pool::PoolInfo;
 use crate::buf::fixed::registry::RegistryInfo;
 use crate::buf::fixed::{pool, registry};
-use crate::buf::{BoundedBufMut, Buffer};
-use crate::WithBuffer;
-use crate::{buf::BoundedBuf, io::SharedFd, OneshotOutputTransform, Result, UnsubmittedOneshot};
-use std::any::TypeId;
-use std::io;
+use crate::buf::{BoundedBuf, BoundedBufMut, Buffer};
+use crate::io::SharedFd;
+use crate::{OneshotOutputTransform, Result, UnsubmittedOneshot, WithBuffer};
 
 #[allow(missing_docs)]
 pub type Unsubmitted = UnsubmittedOneshot<ReadWriteData, ReadWriteTransform>;

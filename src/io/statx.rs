@@ -1,14 +1,11 @@
-use std::ffi::CString;
-use std::{ffi::CStr, io};
+use std::ffi::{CStr, CString};
+use std::io;
 
 use io_uring::{opcode, types};
 
-use crate::runtime::{
-    driver::op::{Completable, CqeResult, Op},
-    CONTEXT,
-};
-
 use super::SharedFd;
+use crate::runtime::driver::op::{Completable, CqeResult, Op};
+use crate::runtime::CONTEXT;
 
 pub(crate) struct Statx {
     #[allow(dead_code)]

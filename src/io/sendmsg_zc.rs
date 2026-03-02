@@ -1,11 +1,13 @@
+use std::io;
+use std::io::IoSlice;
+use std::net::SocketAddr;
+
+use socket2::SockAddr;
+
 use crate::buf::BoundedBuf;
 use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, MultiCQEFuture, Op, Updateable};
 use crate::runtime::CONTEXT;
-use socket2::SockAddr;
-use std::io;
-use std::io::IoSlice;
-use std::net::SocketAddr;
 
 pub(crate) struct SendMsgZc<T, U> {
     #[allow(dead_code)]

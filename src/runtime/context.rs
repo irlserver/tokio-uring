@@ -1,6 +1,7 @@
+use std::cell::RefCell;
+
 use crate::runtime::driver;
 use crate::runtime::driver::{Handle, WeakHandle};
-use std::cell::RefCell;
 
 /// Owns the driver and resides in thread-local storage.
 pub struct RuntimeContext {

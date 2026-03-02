@@ -1,6 +1,7 @@
+use std::io;
+
 use crate::runtime::driver::op::{Completable, CqeResult, Op};
 use crate::runtime::CONTEXT;
-use std::io;
 
 /// Provide buffers operation for multishot receive
 pub struct ProvideBuffers {

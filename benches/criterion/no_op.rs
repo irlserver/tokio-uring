@@ -1,8 +1,8 @@
+use std::time::{Duration, Instant};
+
 use criterion::{
     criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput,
 };
-use std::time::{Duration, Instant};
-
 use tokio::task::JoinSet;
 
 #[derive(Clone)]

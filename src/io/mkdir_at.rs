@@ -1,11 +1,10 @@
-use crate::runtime::driver::op::{Completable, CqeResult, Op};
-use crate::runtime::CONTEXT;
-
-use super::util::cstr;
-
 use std::ffi::CString;
 use std::io;
 use std::path::Path;
+
+use super::util::cstr;
+use crate::runtime::driver::op::{Completable, CqeResult, Op};
+use crate::runtime::CONTEXT;
 
 /// Create a directory at path relative to the current working directory
 /// of the caller's process.

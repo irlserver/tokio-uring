@@ -1,16 +1,11 @@
-use std::{
-    io::prelude::*,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
-};
+use std::io::prelude::*;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 use tempfile::NamedTempFile;
-
+use tokio_uring::buf::fixed::registry;
+use tokio_uring::buf::{BoundedBuf, BoundedBufMut};
 use tokio_uring::fs::File;
-use tokio_uring::Submit;
-use tokio_uring::{
-    buf::{fixed::registry, BoundedBuf, BoundedBufMut},
-    Buffer,
-};
+use tokio_uring::{Buffer, Submit};
 
 #[path = "../src/future.rs"]
 #[allow(warnings)]
@@ -329,6 +324,7 @@ async fn poll_once(future: impl std::future::Future) {
     use std::future::poll_fn;
     // use std::future::Future;
     use std::task::Poll;
+
     use tokio::pin;
 
     pin!(future);

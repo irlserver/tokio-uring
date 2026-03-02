@@ -1,6 +1,8 @@
+use std::io;
+use std::path::Path;
+
 use super::UnixStream;
 use crate::io::Socket;
-use std::{io, path::Path};
 
 /// A Unix socket server, listening for connections.
 ///

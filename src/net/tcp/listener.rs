@@ -1,10 +1,9 @@
+use std::io;
+use std::net::SocketAddr;
+use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
+
 use super::TcpStream;
 use crate::io::{SharedFd, Socket};
-use std::{
-    io,
-    net::SocketAddr,
-    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
-};
 
 /// A TCP socket server, listening for connections.
 ///
@@ -14,8 +13,7 @@ use std::{
 /// # Examples
 ///
 /// ```
-/// use tokio_uring::net::TcpListener;
-/// use tokio_uring::net::TcpStream;
+/// use tokio_uring::net::{TcpListener, TcpStream};
 /// use tokio_uring::Submit;
 ///
 /// let listener = TcpListener::bind("127.0.0.1:2345".parse().unwrap()).unwrap();
@@ -31,8 +29,12 @@ use std::{
 ///     });
 ///     tokio::task::yield_now().await; // Ensure the listener.accept().await has been kicked off.
 ///
-///     let tx = TcpStream::connect("127.0.0.1:2345".parse().unwrap()).await.unwrap();
-///     let rx = rx_ch.await.expect("The spawned task expected to send a TcpStream");
+///     let tx = TcpStream::connect("127.0.0.1:2345".parse().unwrap())
+///         .await
+///         .unwrap();
+///     let rx = rx_ch
+///         .await
+///         .expect("The spawned task expected to send a TcpStream");
 ///
 ///     tx.write(b"test".to_vec().into()).submit().await.unwrap();
 ///
@@ -102,6 +104,7 @@ impl TcpListener {
     ///
     /// ```
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use tokio_uring::net::TcpListener;
     ///
     /// let listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();

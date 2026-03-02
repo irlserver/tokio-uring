@@ -1,16 +1,13 @@
 // An example of an echo server using fixed buffers for reading and writing TCP streams.
 // A buffer registry size of two is created, to allow a maximum of two simultaneous connections.
 
-use std::{env, iter, net::SocketAddr};
+use std::net::SocketAddr;
+use std::{env, iter};
 
-use tokio_uring::{
-    buf::{
-        fixed::registry::{self, FixedBufRegistry},
-        BoundedBuf,
-    },
-    net::{TcpListener, TcpStream},
-    Buffer,
-}; // BoundedBuf for slice method
+use tokio_uring::buf::fixed::registry::{self, FixedBufRegistry};
+use tokio_uring::buf::BoundedBuf;
+use tokio_uring::net::{TcpListener, TcpStream};
+use tokio_uring::Buffer; // BoundedBuf for slice method
 
 // A contrived example, where just two fixed buffers are created.
 const POOL_SIZE: usize = 2;

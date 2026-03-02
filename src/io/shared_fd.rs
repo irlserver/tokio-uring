@@ -1,12 +1,9 @@
+use std::cell::RefCell;
 use std::future::poll_fn;
-
-use std::{
-    cell::RefCell,
-    io,
-    os::unix::io::{BorrowedFd, FromRawFd, RawFd},
-    rc::Rc,
-    task::Waker,
-};
+use std::io;
+use std::os::unix::io::{BorrowedFd, FromRawFd, RawFd};
+use std::rc::Rc;
+use std::task::Waker;
 
 use crate::runtime::driver::op::Op;
 
@@ -67,7 +64,6 @@ impl SharedFd {
     /// An FD cannot be closed until all in-flight operation have completed.
     /// This prevents bugs where in-flight reads could operate on the incorrect
     /// file descriptor.
-    ///
     pub(crate) async fn close(&mut self) -> io::Result<()> {
         loop {
             // Get a mutable reference to Inner, indicating there are no

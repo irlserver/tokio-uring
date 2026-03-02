@@ -1,6 +1,7 @@
-use futures_util::future::LocalBoxFuture;
 use std::io;
 use std::path::Path;
+
+use futures_util::future::LocalBoxFuture;
 
 /// Recursively create a directory and all of its parent components if they are missing.
 ///
@@ -145,9 +146,11 @@ impl DirBuilder {
 }
 
 mod fs_imp {
-    use crate::runtime::driver::op::Op;
-    use libc::mode_t;
     use std::path::Path;
+
+    use libc::mode_t;
+
+    use crate::runtime::driver::op::Op;
 
     #[derive(Debug)]
     pub struct DirBuilder {
@@ -174,7 +177,11 @@ mod fs_imp {
 // Uses one asynchronous uring call to determine this.
 async fn is_dir<P: AsRef<Path>>(path: P) -> bool {
     let mut builder = crate::fs::StatxBuilder::new();
-    if builder.mask(crate::compat::STATX_TYPE).pathname(path).is_err() {
+    if builder
+        .mask(crate::compat::STATX_TYPE)
+        .pathname(path)
+        .is_err()
+    {
         return false;
     }
 

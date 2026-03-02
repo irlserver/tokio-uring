@@ -1,4 +1,6 @@
-use std::{env, net::SocketAddr};
+use std::env;
+use std::net::SocketAddr;
+
 use tokio_uring::net::UdpSocket;
 
 fn main() {

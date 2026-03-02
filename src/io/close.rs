@@ -1,8 +1,9 @@
+use std::io;
+use std::os::unix::io::RawFd;
+
 use crate::runtime::driver::op;
 use crate::runtime::driver::op::{Completable, Op};
 use crate::runtime::CONTEXT;
-use std::io;
-use std::os::unix::io::RawFd;
 
 pub(crate) struct Close {
     fd: RawFd,

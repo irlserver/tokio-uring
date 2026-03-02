@@ -1,14 +1,12 @@
-use crate::{
-    buf::{BoundedBuf, BoundedBufMut, Buffer},
-    io::{SharedFd, Socket},
-    Unsubmitted,
-};
+use std::io;
+use std::net::SocketAddr;
+use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
+
 use socket2::SockAddr;
-use std::{
-    io,
-    net::SocketAddr,
-    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
-};
+
+use crate::buf::{BoundedBuf, BoundedBufMut, Buffer};
+use crate::io::{SharedFd, Socket};
+use crate::Unsubmitted;
 
 /// A UDP socket.
 ///
@@ -24,9 +22,10 @@ use std::{
 /// Bind and connect a pair of sockets and send a packet:
 ///
 /// ```
+/// use std::net::SocketAddr;
+///
 /// use tokio_uring::net::UdpSocket;
 /// use tokio_uring::Submit;
-/// use std::net::SocketAddr;
 /// fn main() -> std::io::Result<()> {
 ///     tokio_uring::start(async {
 ///         let first_addr: SocketAddr = "127.0.0.1:2401".parse().unwrap();
@@ -43,7 +42,11 @@ use std::{
 ///         let buf = vec![0; 32].into();
 ///
 ///         // write data
-///         socket.write(b"hello world".to_vec().into()).submit().await.unwrap();
+///         socket
+///             .write(b"hello world".to_vec().into())
+///             .submit()
+///             .await
+///             .unwrap();
 ///
 ///         // read data
 ///         let (n_bytes, buf) = other_socket.read(buf).await.unwrap();
@@ -51,7 +54,10 @@ use std::{
 ///         assert_eq!(b"hello world", &buf[0][..n_bytes]);
 ///
 ///         // write data using send on connected socket
-///         socket.send(b"hello world via send".as_slice()).await.unwrap();
+///         socket
+///             .send(b"hello world via send".as_slice())
+///             .await
+///             .unwrap();
 ///
 ///         // read data
 ///         let (n_bytes, buf) = other_socket.read(buf).await.unwrap();
@@ -65,8 +71,9 @@ use std::{
 /// Send and receive packets without connecting:
 ///
 /// ```
-/// use tokio_uring::net::UdpSocket;
 /// use std::net::SocketAddr;
+///
+/// use tokio_uring::net::UdpSocket;
 /// fn main() -> std::io::Result<()> {
 ///     tokio_uring::start(async {
 ///         let first_addr: SocketAddr = "127.0.0.1:2401".parse().unwrap();
@@ -79,7 +86,10 @@ use std::{
 ///         let buf = vec![0; 32];
 ///
 ///         // write data
-///         socket.send_to(b"hello world".as_slice(), second_addr).await.unwrap();
+///         socket
+///             .send_to(b"hello world".as_slice(), second_addr)
+///             .await
+///             .unwrap();
 ///
 ///         // read data
 ///         let ((n_bytes, addr), buf) = other_socket.recv_from(buf).await.unwrap();
@@ -114,12 +124,18 @@ impl UdpSocket {
     ///
     /// ```
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use tokio_uring::net::UdpSocket;
     ///
     /// tokio_uring::start(async {
-    ///     let socket = UdpSocket::bind("127.0.0.1:8080".parse().unwrap()).await.unwrap();
+    ///     let socket = UdpSocket::bind("127.0.0.1:8080".parse().unwrap())
+    ///         .await
+    ///         .unwrap();
     ///     let addr = socket.local_addr().expect("Couldn't get local address");
-    ///     assert_eq!(addr, SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    ///     assert_eq!(
+    ///         addr,
+    ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080))
+    ///     );
     /// });
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -147,8 +163,9 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```
-    /// use socket2::{Protocol, Socket, Type};
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
+    /// use socket2::{Protocol, Socket, Type};
     /// use tokio_uring::net::UdpSocket;
     ///
     /// fn main() -> std::io::Result<()> {
@@ -363,9 +380,17 @@ impl UdpSocket {
         &self,
         buf_group_id: u16,
         buffer_provider: std::sync::Arc<dyn crate::io::BufferProvider>,
-    ) -> io::Result<crate::runtime::driver::op::Op<crate::io::RecvFromMultishot, crate::runtime::driver::op::MultiCQEFuture>> {
-        
-        crate::io::RecvFromMultishot::recv_from_multishot(&self.inner.fd, buf_group_id, buffer_provider)
+    ) -> io::Result<
+        crate::runtime::driver::op::Op<
+            crate::io::RecvFromMultishot,
+            crate::runtime::driver::op::MultiCQEFuture,
+        >,
+    > {
+        crate::io::RecvFromMultishot::recv_from_multishot(
+            &self.inner.fd,
+            buf_group_id,
+            buffer_provider,
+        )
     }
 
     /// Start receiving packets using multishot mode with custom batch size.
@@ -377,9 +402,18 @@ impl UdpSocket {
         buf_group_id: u16,
         buffer_provider: std::sync::Arc<dyn crate::io::BufferProvider>,
         batch_size: usize,
-    ) -> io::Result<crate::runtime::driver::op::Op<crate::io::RecvFromMultishot, crate::runtime::driver::op::MultiCQEFuture>> {
-        
-        crate::io::RecvFromMultishot::recv_from_multishot_with_batch_size(&self.inner.fd, buf_group_id, buffer_provider, batch_size)
+    ) -> io::Result<
+        crate::runtime::driver::op::Op<
+            crate::io::RecvFromMultishot,
+            crate::runtime::driver::op::MultiCQEFuture,
+        >,
+    > {
+        crate::io::RecvFromMultishot::recv_from_multishot_with_batch_size(
+            &self.inner.fd,
+            buf_group_id,
+            buffer_provider,
+            batch_size,
+        )
     }
 
     /// Shuts down the read, write, or both halves of this connection.

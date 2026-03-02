@@ -1,9 +1,11 @@
+use std::boxed::Box;
+use std::io;
+use std::net::SocketAddr;
+
 use crate::io::{SharedFd, Socket};
 use crate::runtime::driver::op;
 use crate::runtime::driver::op::{Completable, Op};
 use crate::runtime::CONTEXT;
-use std::net::SocketAddr;
-use std::{boxed::Box, io};
 
 pub(crate) struct Accept {
     fd: SharedFd,

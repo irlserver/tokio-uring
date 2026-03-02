@@ -2,10 +2,9 @@
 #[allow(warnings)]
 mod future;
 
+use tempfile::tempdir;
 use tokio_test::assert_ok;
 use tokio_uring::fs;
-
-use tempfile::tempdir;
 
 #[test]
 fn basic_create_dir() {

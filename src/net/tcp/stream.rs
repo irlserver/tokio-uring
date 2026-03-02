@@ -1,14 +1,10 @@
-use std::{
-    io,
-    net::SocketAddr,
-    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
-};
+use std::io;
+use std::net::SocketAddr;
+use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
 
-use crate::{
-    buf::{BoundedBuf, Buffer},
-    io::{SharedFd, Socket},
-    Submit, Unsubmitted,
-};
+use crate::buf::{BoundedBuf, Buffer};
+use crate::io::{SharedFd, Socket};
+use crate::{Submit, Unsubmitted};
 
 /// A TCP stream between a local and a remote socket.
 ///
@@ -18,9 +14,10 @@ use crate::{
 /// # Examples
 ///
 /// ```no_run
+/// use std::net::ToSocketAddrs;
+///
 /// use tokio_uring::net::TcpStream;
 /// use tokio_uring::Submit;
-/// use std::net::ToSocketAddrs;
 ///
 /// fn main() -> std::io::Result<()> {
 ///     tokio_uring::start(async {
@@ -28,7 +25,11 @@ use crate::{
 ///         let mut stream = TcpStream::connect("127.0.0.1:8080".parse().unwrap()).await?;
 ///
 ///         // Write some data.
-///         stream.write(b"hello world!".to_vec().into()).submit().await.unwrap();
+///         stream
+///             .write(b"hello world!".to_vec().into())
+///             .submit()
+///             .await
+///             .unwrap();
 ///
 ///         Ok(())
 ///     })

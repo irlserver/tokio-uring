@@ -1,7 +1,6 @@
-use super::{BoundedBuf, BoundedBufMut, IoBuf, IoBufMut};
+use std::{cmp, ops};
 
-use std::cmp;
-use std::ops;
+use super::{BoundedBuf, BoundedBufMut, IoBuf, IoBufMut};
 
 /// An owned view into a contiguous sequence of bytes.
 ///

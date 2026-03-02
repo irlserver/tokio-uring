@@ -5,8 +5,9 @@
 //! which holds the index of the first element of the list.
 //! It also holds the index of the last element, to support
 //! push operations without list traversal.
-use slab::Slab;
 use std::ops::{Deref, DerefMut};
+
+use slab::Slab;
 
 /// A linked list backed by slab storage
 pub(crate) struct SlabList<'a, T> {

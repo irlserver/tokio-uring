@@ -1,14 +1,15 @@
+use std::boxed::Box;
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+use socket2::SockAddr;
+use tracing::trace;
+
+use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, MultiCQEFuture, Op, Updateable};
 use crate::runtime::CONTEXT;
-use crate::{io::SharedFd, Result};
-use socket2::SockAddr;
-use std::{
-    io,
-    net::SocketAddr,
-    boxed::Box,
-    sync::Arc,
-};
-use tracing::trace;
+use crate::Result;
 
 /// Callback trait for accessing buffer data by ID
 pub trait BufferProvider: Send + Sync {
@@ -16,11 +17,11 @@ pub trait BufferProvider: Send + Sync {
 }
 
 /// Multishot receive from operation for UDP sockets
-/// 
+///
 /// This uses io_uring's IORING_RECV_MULTISHOT feature to receive multiple
 /// packets with a single SQE submission. Each packet completion returns a
 /// buffer from the provided buffer pool.
-/// 
+///
 /// This implementation batches received packets and yields them in groups
 /// for more efficient processing.
 pub struct RecvFromMultishot {
@@ -100,30 +101,33 @@ impl RecvFromMultishot {
         );
 
         CONTEXT.with(|x| {
-            let result = x.handle().expect("Not in a runtime context").submit_op::<_, MultiCQEFuture, _>(
-                RecvFromMultishot {
-                    fd: fd.clone(),
-                    buf_group_id,
-                    socket_addr,
-                    msghdr,
-                    io_slices,
-                    buffer_provider,
-                    batch: Vec::with_capacity(batch_size),
-                    batch_size,
-                    msg_namelen,
-                    msg_controllen,
-                },
-                |recv_from| {
-                    let sqe = opcode::RecvMsgMulti::new(
-                        types::Fd(recv_from.fd.raw_fd()),
-                        recv_from.msghdr.as_mut() as *mut _,
-                        recv_from.buf_group_id,
-                    )
-                    .build();
-                    trace!(fd = recv_from.fd.raw_fd(), "RecvMsgMulti SQE created");
-                    sqe
-                },
-            );
+            let result = x
+                .handle()
+                .expect("Not in a runtime context")
+                .submit_op::<_, MultiCQEFuture, _>(
+                    RecvFromMultishot {
+                        fd: fd.clone(),
+                        buf_group_id,
+                        socket_addr,
+                        msghdr,
+                        io_slices,
+                        buffer_provider,
+                        batch: Vec::with_capacity(batch_size),
+                        batch_size,
+                        msg_namelen,
+                        msg_controllen,
+                    },
+                    |recv_from| {
+                        let sqe = opcode::RecvMsgMulti::new(
+                            types::Fd(recv_from.fd.raw_fd()),
+                            recv_from.msghdr.as_mut() as *mut _,
+                            recv_from.buf_group_id,
+                        )
+                        .build();
+                        trace!(fd = recv_from.fd.raw_fd(), "RecvMsgMulti SQE created");
+                        sqe
+                    },
+                );
             trace!("RecvFromMultishot op submitted successfully");
             result
         })
@@ -136,7 +140,7 @@ pub struct RecvFromMultishotResult {
     pub source_addr: SocketAddr,
     pub buffer_id: u16,
     pub payload_offset: usize, // Offset within buffer where payload starts
-    pub more: bool, // Whether more packets are expected
+    pub more: bool,            // Whether more packets are expected
 }
 
 /// Parse RecvMsgOut header from buffer
@@ -156,15 +160,23 @@ pub struct RecvFromMultishotResult {
 /// - Name data at offset 16, actual length = RecvMsgOut.namelen
 /// - Control data at offset 16 + msg_namelen, actual length = RecvMsgOut.controllen
 /// - Payload at offset 16 + msg_namelen + msg_controllen, actual length = RecvMsgOut.payloadlen
-fn parse_recvmsg_out(buffer: &[u8], msg_namelen: usize, msg_controllen: usize) -> io::Result<(SocketAddr, usize, usize)> {
+fn parse_recvmsg_out(
+    buffer: &[u8],
+    msg_namelen: usize,
+    msg_controllen: usize,
+) -> io::Result<(SocketAddr, usize, usize)> {
     // Header is 16 bytes (4 x u32)
     if buffer.len() < 16 {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "Buffer too small for RecvMsgOut header"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Buffer too small for RecvMsgOut header",
+        ));
     }
 
     // Parse header fields (little-endian) - these are ACTUAL bytes written
     let actual_namelen = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
-    let actual_controllen = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
+    let actual_controllen =
+        u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
     let payloadlen = u32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]) as usize;
     // flags at offset 12-15 (we don't need them here)
 
@@ -182,8 +194,14 @@ fn parse_recvmsg_out(buffer: &[u8], msg_namelen: usize, msg_controllen: usize) -
     // Validate buffer has enough space
     let total_size = payload_offset + payloadlen;
     if buffer.len() < total_size {
-        return Err(io::Error::new(io::ErrorKind::InvalidData,
-            format!("Buffer too small: expected {}, got {}", total_size, buffer.len())));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Buffer too small: expected {}, got {}",
+                total_size,
+                buffer.len()
+            ),
+        ));
     }
 
     // Parse source address from name data (at offset 16, using actual_namelen)
@@ -198,12 +216,17 @@ fn parse_recvmsg_out(buffer: &[u8], msg_namelen: usize, msg_controllen: usize) -
                 *len_ptr = actual_namelen as u32;
                 Ok(())
             })
-        }.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        }
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        socket2_addr.as_socket()
+        socket2_addr
+            .as_socket()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid socket address"))?
     } else {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "Name length too small"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Name length too small",
+        ));
     };
 
     Ok((source_addr, payload_offset, payloadlen))
@@ -216,15 +239,17 @@ impl Completable for RecvFromMultishot {
         // Process the final CQE (without 'more' flag) and return the accumulated batch
         let flags = cqe.flags;
         let res = cqe.result.map(|v| v as usize);
-        
+
         // If this final CQE has valid data, add it to the batch
         if let Ok(n) = res {
             if let Some(buffer_id) = io_uring::cqueue::buffer_select(flags) {
                 let more = io_uring::cqueue::more(flags);
-                
+
                 // Parse RecvMsgOut to get source address and payload
                 let buffer = self.buffer_provider.get_buffer(buffer_id, n);
-                if let Ok((source_addr, payload_offset, payloadlen)) = parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen) {
+                if let Ok((source_addr, payload_offset, payloadlen)) =
+                    parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen)
+                {
                     self.batch.push(RecvFromMultishotResult {
                         bytes_received: payloadlen,
                         source_addr,
@@ -235,7 +260,7 @@ impl Completable for RecvFromMultishot {
                 }
             }
         }
-        
+
         // Return the accumulated batch
         Ok(self.batch)
     }
@@ -271,7 +296,7 @@ impl Updateable for RecvFromMultishot {
                         );
 
                         self.batch.push(RecvFromMultishotResult {
-                            bytes_received: payloadlen,  // Return payload length, not total buffer size
+                            bytes_received: payloadlen, // Return payload length, not total buffer size
                             source_addr,
                             buffer_id,
                             payload_offset,
@@ -283,20 +308,23 @@ impl Updateable for RecvFromMultishot {
                     }
                 }
             } else {
-                trace!(flags = flags, "RecvFromMultishot::update - NO buffer_id in flags");
+                trace!(
+                    flags = flags,
+                    "RecvFromMultishot::update - NO buffer_id in flags"
+                );
             }
         } else {
             trace!(?res, "RecvFromMultishot::update - ERROR result");
         }
     }
-    
+
     fn should_yield(&self) -> bool {
         // Yield when we have accumulated any packets
         // This ensures buffers are returned promptly even in low-traffic scenarios
         // Previously only yielded on full batch (batch_size), causing buffer exhaustion
         !self.batch.is_empty()
     }
-    
+
     fn yield_result(&mut self) -> Self::Output {
         // Drain the current batch and return it
         // Use mem::replace to swap with a fresh Vec while keeping capacity

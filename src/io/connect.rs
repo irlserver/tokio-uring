@@ -1,8 +1,10 @@
+use std::io;
+
+use socket2::SockAddr;
+
 use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, Op};
 use crate::runtime::CONTEXT;
-use socket2::SockAddr;
-use std::io;
 
 /// Open a file
 pub(crate) struct Connect {

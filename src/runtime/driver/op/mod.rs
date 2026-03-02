@@ -203,13 +203,13 @@ pub trait Updateable: Completable {
     /// Update will be called for cqe's which have the `more` flag set.
     /// The Op should update any internal state as required.
     fn update(&mut self, cqe: CqeResult);
-    
+
     /// Returns true if the operation should yield now (e.g., batch is full)
     /// even though more CQEs may arrive. Default is false (only yield on final CQE).
     fn should_yield(&self) -> bool {
         false
     }
-    
+
     /// Called to get the intermediate result when yielding before completion.
     /// Only called if should_yield() returns true.
     /// Default implementation panics - override if should_yield() can return true.

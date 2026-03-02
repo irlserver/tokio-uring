@@ -1,12 +1,15 @@
+use std::boxed::Box;
+use std::io;
+use std::io::IoSlice;
+use std::net::SocketAddr;
+
+use socket2::SockAddr;
+
 use crate::buf::BoundedBuf;
 use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, Op};
 use crate::runtime::CONTEXT;
-use crate::Result;
-use crate::WithBuffer;
-use socket2::SockAddr;
-use std::io::IoSlice;
-use std::{boxed::Box, io, net::SocketAddr};
+use crate::{Result, WithBuffer};
 
 pub(crate) struct SendTo<T> {
     #[allow(dead_code)]

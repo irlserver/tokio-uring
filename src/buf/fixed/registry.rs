@@ -6,13 +6,13 @@
 //!
 //! [`FixedBufRegister`]: self::FixedBufRegister
 
-use super::plumbing;
+use std::io;
+use std::sync::{Arc, Mutex};
 
+use super::plumbing;
 use crate::buf::BufferImpl;
 use crate::runtime::CONTEXT;
 use crate::Buffer;
-use std::io;
-use std::sync::{Arc, Mutex};
 
 /// An indexed collection of I/O buffers pre-registered with the kernel.
 ///
@@ -104,9 +104,10 @@ impl FixedBufRegistry {
 /// [`iter::repeat`]: std::iter::repeat
 ///
 /// ```should_panic
+/// use std::iter;
+///
 /// use tokio_uring::buf::fixed::registry;
 /// use tokio_uring::Buffer;
-/// use std::iter;
 ///
 /// # #[allow(non_snake_case)]
 /// # fn main() -> Result<(), std::io::Error> {
@@ -116,7 +117,11 @@ impl FixedBufRegistry {
 /// # let BUF_SIZE = 4096;
 ///
 /// tokio_uring::start(async {
-///     let registry = registry::register(iter::repeat(Vec::<u8>::with_capacity(BUF_SIZE)).take(NUM_BUFFERS).map(Buffer::from))?;
+///     let registry = registry::register(
+///         iter::repeat(Vec::<u8>::with_capacity(BUF_SIZE))
+///             .take(NUM_BUFFERS)
+///             .map(Buffer::from),
+///     )?;
 ///     // ...
 ///     Ok(())
 /// })
@@ -126,9 +131,10 @@ impl FixedBufRegistry {
 /// Instead, create the vectors with requested capacity directly:
 ///
 /// ```
+/// use std::iter;
+///
 /// use tokio_uring::buf::fixed::registry;
 /// use tokio_uring::Buffer;
-/// use std::iter;
 ///
 /// # #[allow(non_snake_case)]
 /// # fn main() -> Result<(), std::io::Error> {
@@ -138,7 +144,11 @@ impl FixedBufRegistry {
 /// # let BUF_SIZE = 4096;
 ///
 /// tokio_uring::start(async {
-///     let registry = registry::register(iter::repeat_with(|| Vec::<u8>::with_capacity(BUF_SIZE)).take(NUM_BUFFERS).map(Buffer::from))?;
+///     let registry = registry::register(
+///         iter::repeat_with(|| Vec::<u8>::with_capacity(BUF_SIZE))
+///             .take(NUM_BUFFERS)
+///             .map(Buffer::from),
+///     )?;
 ///     // ...
 ///     Ok(())
 /// })

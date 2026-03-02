@@ -1,9 +1,9 @@
-use crate::fs::File;
-
-use crate::runtime::driver::op::Op;
 use std::io;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
+
+use crate::fs::File;
+use crate::runtime::driver::op::Op;
 
 /// Options and flags which can be used to configure how a file is opened.
 ///
@@ -27,10 +27,7 @@ use std::path::Path;
 ///
 /// fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     tokio_uring::start(async {
-///         let file = OpenOptions::new()
-///             .read(true)
-///             .open("foo.txt")
-///             .await?;
+///         let file = OpenOptions::new().read(true).open("foo.txt").await?;
 ///         Ok(())
 ///     })
 /// }
@@ -78,10 +75,7 @@ impl OpenOptions {
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
-    ///         let file = OpenOptions::new()
-    ///             .read(true)
-    ///             .open("foo.txt")
-    ///             .await?;
+    ///         let file = OpenOptions::new().read(true).open("foo.txt").await?;
     ///         Ok(())
     ///     })
     /// }
@@ -112,10 +106,7 @@ impl OpenOptions {
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
-    ///         let file = OpenOptions::new()
-    ///             .read(true)
-    ///             .open("foo.txt")
-    ///             .await?;
+    ///         let file = OpenOptions::new().read(true).open("foo.txt").await?;
     ///         Ok(())
     ///     })
     /// }
@@ -140,10 +131,7 @@ impl OpenOptions {
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
-    ///         let file = OpenOptions::new()
-    ///             .write(true)
-    ///             .open("foo.txt")
-    ///             .await?;
+    ///         let file = OpenOptions::new().write(true).open("foo.txt").await?;
     ///         Ok(())
     ///     })
     /// }
@@ -176,10 +164,7 @@ impl OpenOptions {
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
-    ///         let file = OpenOptions::new()
-    ///             .append(true)
-    ///             .open("foo.txt")
-    ///             .await?;
+    ///         let file = OpenOptions::new().append(true).open("foo.txt").await?;
     ///         Ok(())
     ///     })
     /// }
@@ -318,10 +303,7 @@ impl OpenOptions {
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     tokio_uring::start(async {
-    ///         let file = OpenOptions::new()
-    ///             .read(true)
-    ///             .open("foo.txt")
-    ///             .await?;
+    ///         let file = OpenOptions::new().read(true).open("foo.txt").await?;
     ///         Ok(())
     ///     })
     /// }
