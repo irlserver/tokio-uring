@@ -20,7 +20,7 @@ mod read_fixed;
 mod recv_from;
 
 pub(crate) mod recv_from_multishot;
-pub use recv_from_multishot::{BufferProvider, RecvFromMultishot, RecvFromMultishotResult};
+pub use recv_from_multishot::{BufferProvider, RecvFromMultishot};
 
 mod provide_buffers;
 pub use provide_buffers::ProvideBuffers;

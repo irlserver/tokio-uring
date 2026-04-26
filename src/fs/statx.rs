@@ -326,8 +326,8 @@ pub async fn is_dir_regfile<P: AsRef<Path>>(path: P) -> (bool, bool) {
     let res = builder.statx().await;
     match res {
         Ok(statx) => (
-            (u32::from(statx.stx_mode) & libc::S_IFMT as u32) == libc::S_IFDIR as u32,
-            (u32::from(statx.stx_mode) & libc::S_IFMT as u32) == libc::S_IFREG as u32,
+            (u32::from(statx.stx_mode) & libc::S_IFMT) == libc::S_IFDIR,
+            (u32::from(statx.stx_mode) & libc::S_IFMT) == libc::S_IFREG,
         ),
         Err(_) => (false, false),
     }

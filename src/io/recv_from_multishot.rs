@@ -9,7 +9,6 @@ use tracing::trace;
 use crate::io::SharedFd;
 use crate::runtime::driver::op::{Completable, CqeResult, MultiCQEFuture, Op, Updateable};
 use crate::runtime::CONTEXT;
-use crate::Result;
 
 /// Callback trait for accessing buffer data by ID
 pub trait BufferProvider: Send + Sync {
@@ -175,7 +174,7 @@ fn parse_recvmsg_out(
 
     // Parse header fields (little-endian) - these are ACTUAL bytes written
     let actual_namelen = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
-    let actual_controllen =
+    let _actual_controllen =
         u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
     let payloadlen = u32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]) as usize;
     // flags at offset 12-15 (we don't need them here)

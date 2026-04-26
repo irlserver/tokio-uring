@@ -187,7 +187,7 @@ async fn is_dir<P: AsRef<Path>>(path: P) -> bool {
 
     let res = builder.statx().await;
     match res {
-        Ok(statx) => (u32::from(statx.stx_mode) & libc::S_IFMT as u32) == libc::S_IFDIR as u32,
+        Ok(statx) => (u32::from(statx.stx_mode) & libc::S_IFMT) == libc::S_IFDIR,
         Err(_) => false,
     }
 }

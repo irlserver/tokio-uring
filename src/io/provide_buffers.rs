@@ -20,7 +20,7 @@ impl ProvideBuffers {
         bgid: u16,
         bid: u16,
     ) -> io::Result<Op<ProvideBuffers>> {
-        use io_uring::{opcode, types};
+        use io_uring::opcode;
 
         CONTEXT.with(|x| {
             x.handle().expect("Not in a runtime context").submit_op(
