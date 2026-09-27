@@ -85,7 +85,9 @@ use std::future::Future;
 
 pub use buf::Buffer;
 pub use io::read_write::*;
-pub use io::recv_from_multishot::{BufferProvider, RecvFromMultishotResult};
+pub use io::recv_from_multishot::{
+    BufferProvider, RecvFromMultishotBatch, RecvFromMultishotResult,
+};
 pub use io::{ProvideBuffers, RecvFromMultishot};
 pub use runtime::driver::op::{
     InFlightOneshot, Link, LinkedInFlightOneshot, MultiCQEFuture, OneshotOutputTransform,

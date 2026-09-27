@@ -29,9 +29,13 @@ pub struct RecvFromMultishot {
     socket_addr: Box<SockAddr>,
     msghdr: Box<libc::msghdr>,
     io_slices: Vec<libc::iovec>,
+    // Stable target for the iovec's base pointer; see the constructor.
+    _iov_target: Box<[u8; 1]>,
     buffer_provider: Arc<dyn BufferProvider>,
     // Accumulated packets waiting to be yielded
     batch: Vec<RecvFromMultishotResult>,
+    // Buffers the kernel filled with something that could not be parsed
+    unparsed_buffers: Vec<u16>,
     batch_size: usize,
     // CRITICAL: These determine the buffer layout for payload offset calculation
     // The kernel RESERVES this much space in the buffer, regardless of actual data
@@ -67,11 +71,12 @@ impl RecvFromMultishot {
         // The actual buffer pointer doesn't matter since provided buffers are used.
         const MAX_PAYLOAD: usize = 1500; // MTU
 
-        // Leak a small buffer to create a stable pointer for the iovec
-        // This is a one-time allocation per multishot operation
-        let dummy_buf = Box::leak(Box::new([0u8; 1]));
+        // The kernel only reads iov_len here, but the base must still point
+        // somewhere valid. The op owns the target, so it lives as long as the
+        // SQE that references it.
+        let mut iov_target = Box::new([0u8; 1]);
         let iovec = libc::iovec {
-            iov_base: dummy_buf.as_mut_ptr() as *mut libc::c_void,
+            iov_base: iov_target.as_mut_ptr() as *mut libc::c_void,
             iov_len: MAX_PAYLOAD,
         };
         let io_slices = vec![iovec];
@@ -110,8 +115,10 @@ impl RecvFromMultishot {
                         socket_addr,
                         msghdr,
                         io_slices,
+                        _iov_target: iov_target,
                         buffer_provider,
                         batch: Vec::with_capacity(batch_size),
+                        unparsed_buffers: Vec::new(),
                         batch_size,
                         msg_namelen,
                         msg_controllen,
@@ -131,6 +138,27 @@ impl RecvFromMultishot {
             result
         })
     }
+}
+
+/// What one poll of a multishot receive yields.
+///
+/// Every buffer id in `packets` and `unparsed_buffers` was taken from the
+/// provided buffer group by the kernel. The caller owns them and must provide
+/// them again, or the group runs dry and the kernel ends the multishot with
+/// ENOBUFS.
+pub struct RecvFromMultishotBatch {
+    /// Datagrams received, in arrival order.
+    pub packets: Vec<RecvFromMultishotResult>,
+    /// Buffers the kernel filled but whose contents could not be parsed (a
+    /// datagram too large for the buffer, for example). The data is dropped;
+    /// the buffers still have to be returned.
+    pub unparsed_buffers: Vec<u16>,
+    /// `Some` on the last batch of the op: the kernel ended the multishot.
+    /// Holds the error of the final completion (ECANCELED after the op's
+    /// `cancel`, ENOBUFS when the buffer group ran dry, a socket error such as
+    /// ECONNREFUSED), or `Ok(())` if it ended after delivering data. The op
+    /// must not be polled again; submit a new one to keep receiving.
+    pub end: Option<io::Result<()>>,
 }
 
 /// Result of a single multishot receive completion
@@ -231,103 +259,87 @@ fn parse_recvmsg_out(
     Ok((source_addr, payload_offset, payloadlen))
 }
 
-impl Completable for RecvFromMultishot {
-    type Output = std::result::Result<Vec<RecvFromMultishotResult>, std::io::Error>;
+impl RecvFromMultishot {
+    /// Record one successful completion: a parsed packet, or a buffer to hand
+    /// back when the contents cannot be parsed.
+    fn record(&mut self, n: usize, flags: u32) {
+        let Some(buffer_id) = io_uring::cqueue::buffer_select(flags) else {
+            trace!(
+                flags = flags,
+                "RecvFromMultishot: completion without a buffer"
+            );
+            return;
+        };
+        let more = io_uring::cqueue::more(flags);
+        let buffer = self.buffer_provider.get_buffer(buffer_id, n);
 
-    fn complete(mut self, cqe: CqeResult) -> Self::Output {
-        // Process the final CQE (without 'more' flag) and return the accumulated batch
-        let flags = cqe.flags;
-        let res = cqe.result.map(|v| v as usize);
-
-        // If this final CQE has valid data, add it to the batch
-        if let Ok(n) = res {
-            if let Some(buffer_id) = io_uring::cqueue::buffer_select(flags) {
-                let more = io_uring::cqueue::more(flags);
-
-                // Parse RecvMsgOut to get source address and payload
-                let buffer = self.buffer_provider.get_buffer(buffer_id, n);
-                if let Ok((source_addr, payload_offset, payloadlen)) =
-                    parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen)
-                {
-                    self.batch.push(RecvFromMultishotResult {
-                        bytes_received: payloadlen,
-                        source_addr,
-                        buffer_id,
-                        payload_offset,
-                        more,
-                    });
-                }
+        match parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen) {
+            Ok((source_addr, payload_offset, payloadlen)) => {
+                trace!(
+                    %source_addr,
+                    payload_offset = payload_offset,
+                    payloadlen = payloadlen,
+                    buffer_id = buffer_id,
+                    more = more,
+                    "RecvFromMultishot: packet received"
+                );
+                self.batch.push(RecvFromMultishotResult {
+                    bytes_received: payloadlen,
+                    source_addr,
+                    buffer_id,
+                    payload_offset,
+                    more,
+                });
+            }
+            Err(e) => {
+                trace!(error = %e, buffer_id = buffer_id, "RecvFromMultishot: unparsable completion");
+                self.unparsed_buffers.push(buffer_id);
             }
         }
+    }
 
-        // Return the accumulated batch
-        Ok(self.batch)
+    fn take_batch(&mut self, end: Option<io::Result<()>>) -> RecvFromMultishotBatch {
+        RecvFromMultishotBatch {
+            packets: std::mem::replace(&mut self.batch, Vec::with_capacity(self.batch_size)),
+            unparsed_buffers: std::mem::take(&mut self.unparsed_buffers),
+            end,
+        }
+    }
+}
+
+impl Completable for RecvFromMultishot {
+    type Output = RecvFromMultishotBatch;
+
+    /// Called for the final completion, the one without the `more` flag.
+    fn complete(mut self, cqe: CqeResult) -> Self::Output {
+        let end = match cqe.result {
+            Ok(n) => {
+                self.record(n as usize, cqe.flags);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        };
+        self.take_batch(Some(end))
     }
 }
 
 impl Updateable for RecvFromMultishot {
     fn update(&mut self, cqe: CqeResult) {
-        // For multishot operations, we accumulate packets in a batch
-        // The kernel will continue posting CQEs until the operation is cancelled
-        // or an error occurs
-
-        let flags = cqe.flags;
-        let res = cqe.result.map(|v| v as usize);
-
-        if let Ok(n) = res {
-            // Extract buffer ID from CQE flags
-            if let Some(buffer_id) = io_uring::cqueue::buffer_select(flags) {
-                // Check if more completions are expected
-                let more = io_uring::cqueue::more(flags);
-
-                // Get buffer data and parse RecvMsgOut structure
-                let buffer = self.buffer_provider.get_buffer(buffer_id, n);
-
-                match parse_recvmsg_out(buffer, self.msg_namelen, self.msg_controllen) {
-                    Ok((source_addr, payload_offset, payloadlen)) => {
-                        trace!(
-                            %source_addr,
-                            payload_offset = payload_offset,
-                            payloadlen = payloadlen,
-                            buffer_id = buffer_id,
-                            more = more,
-                            "RecvFromMultishot::update - packet received"
-                        );
-
-                        self.batch.push(RecvFromMultishotResult {
-                            bytes_received: payloadlen, // Return payload length, not total buffer size
-                            source_addr,
-                            buffer_id,
-                            payload_offset,
-                            more,
-                        });
-                    }
-                    Err(e) => {
-                        trace!(error = %e, "RecvFromMultishot::update - Failed to parse RecvMsgOut");
-                    }
-                }
-            } else {
-                trace!(
-                    flags = flags,
-                    "RecvFromMultishot::update - NO buffer_id in flags"
-                );
-            }
-        } else {
-            trace!(?res, "RecvFromMultishot::update - ERROR result");
+        match cqe.result {
+            Ok(n) => self.record(n as usize, cqe.flags),
+            // The kernel ends a multishot on error, so an error completion
+            // carries no `more` flag and arrives through `complete` instead.
+            Err(e) => trace!(error = %e, "RecvFromMultishot: error completion with more flag"),
         }
     }
 
     fn should_yield(&self) -> bool {
-        // Yield when we have accumulated any packets
-        // This ensures buffers are returned promptly even in low-traffic scenarios
-        // Previously only yielded on full batch (batch_size), causing buffer exhaustion
-        !self.batch.is_empty()
+        // Yield whatever has arrived, so buffers go back to the kernel
+        // promptly even at low traffic.
+        !self.batch.is_empty() || !self.unparsed_buffers.is_empty()
     }
 
     fn yield_result(&mut self) -> Self::Output {
-        // Drain the current batch and return it
-        // Use mem::replace to swap with a fresh Vec while keeping capacity
-        let batch = std::mem::replace(&mut self.batch, Vec::with_capacity(self.batch_size));
-        Ok(batch)
+        self.take_batch(None)
     }
 }

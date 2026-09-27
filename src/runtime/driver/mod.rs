@@ -175,7 +175,28 @@ impl Driver {
         Ok(op)
     }
 
+    pub(crate) fn cancel_op(&mut self, index: usize) -> io::Result<()> {
+        if !self.ops.lifecycle.contains(index) {
+            return Ok(());
+        }
+        // The cancel's own completion carries u64::MAX, which
+        // `dispatch_completions` skips. The cancelled op reports through its
+        // own final completion.
+        let sqe = AsyncCancel::new(index as u64).build().user_data(u64::MAX);
+        while unsafe { self.uring.submission().push(&sqe).is_err() } {
+            self.submit()?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn remove_op<T, CqeType>(&mut self, op: &mut Op<T, CqeType>) {
+        // An op without data has already delivered its final completion and
+        // left the slab. Its index may belong to a newer op by now, which
+        // must not be touched.
+        if op.is_finished() {
+            return;
+        }
+
         // Get the Op Lifecycle state from the driver
         let (lifecycle, completions) = match self.ops.get_mut(op.index()) {
             Some(val) => val,
@@ -313,6 +334,12 @@ impl Driver {
     where
         T: Unpin + 'static + Completable + Updateable,
     {
+        // Same reasoning as in `remove_op`: the index may have been reused.
+        assert!(
+            !op.is_finished(),
+            "multishot op polled after its final completion"
+        );
+
         let (lifecycle, completions) = match self.ops.get_mut(op.index()) {
             Some(val) => val,
             None => {

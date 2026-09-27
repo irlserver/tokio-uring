@@ -273,6 +273,11 @@ impl<T, CqeType> Op<T, CqeType> {
         self.index
     }
 
+    /// The op's final completion has been consumed and its slab entry freed.
+    pub(super) fn is_finished(&self) -> bool {
+        self.data.is_none()
+    }
+
     pub(super) fn take_data(&mut self) -> Option<T> {
         self.data.take()
     }
@@ -293,6 +298,28 @@ where
             .upgrade()
             .expect("Not in runtime context")
             .poll_op(self.get_mut(), cx)
+    }
+}
+
+impl<T> Op<T, MultiCQEFuture> {
+    /// Ask the kernel to end this multishot op with an
+    /// `IORING_OP_ASYNC_CANCEL`.
+    ///
+    /// The op stays live: completions already on their way are still
+    /// delivered, and the kernel then posts a final completion (usually
+    /// ECANCELED). Keep polling until that final completion, so every
+    /// resource the op consumed (provided buffers, for example) reaches the
+    /// caller. Dropping the op instead discards those completions.
+    ///
+    /// A no-op once the final completion has been returned.
+    pub fn cancel(&self) -> io::Result<()> {
+        if self.is_finished() {
+            return Ok(());
+        }
+        self.driver
+            .upgrade()
+            .expect("Not in runtime context")
+            .cancel_op(self.index)
     }
 }
 

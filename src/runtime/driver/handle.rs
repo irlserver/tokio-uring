@@ -104,6 +104,10 @@ impl Handle {
         self.inner.borrow_mut().poll_multishot_op(op, cx)
     }
 
+    pub(crate) fn cancel_op(&self, index: usize) -> io::Result<()> {
+        self.inner.borrow_mut().cancel_op(index)
+    }
+
     pub(crate) fn remove_op<T, CqeType>(&self, op: &mut Op<T, CqeType>) {
         self.inner.borrow_mut().remove_op(op)
     }
